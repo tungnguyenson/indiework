@@ -656,6 +656,7 @@
 .set-input:focus { border-color: var(--accent-ring); box-shadow: 0 0 0 3px var(--accent-softer); }
 
 /* Appearance — UI font picker */
+.font-preview-input { max-width: 620px; margin-bottom: 14px; }
 .font-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 620px; }
 .font-opt { text-align: left; border: 1px solid var(--border-soft); border-radius: var(--r-md);
   background: var(--bg-surface); padding: 15px 16px 16px; display: flex; flex-direction: column; gap: 10px;

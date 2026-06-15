@@ -21,6 +21,10 @@ interface Workspace {
 
 type SettingsSection = 'general' | 'appearance' | 'api';
 
+/** Neutral English default for the font preview; users can type their own
+ *  (Vietnamese, currency, anything) to test a face. */
+const FONT_SAMPLE_DEFAULT = 'Plan, build & ship — $12,840';
+
 const SECTIONS: { id: SettingsSection; label: string; icon: keyof typeof Ic }[] = [
   { id: 'general', label: 'General', icon: 'sun' },
   { id: 'appearance', label: 'Appearance', icon: 'type' },
@@ -68,13 +72,24 @@ export function SettingsScreen({
 
 function AppearancePane() {
   const [uiFont, setUiFont] = useUiFont();
+  const [preview, setPreview] = useState('');
+  const sample = preview.trim() ? preview : FONT_SAMPLE_DEFAULT;
   return (
     <div className="settings-pane">
       <h1 className="settings-h">Appearance</h1>
       <p className="settings-sub">
-        Choose the typeface IndieWork uses across the app. Every option has full Vietnamese
-        support, so accented characters always render cleanly.
+        Choose the typeface IndieWork uses across the app. Every option supports Vietnamese and
+        the wider Latin range, so accented characters render cleanly. Type below to preview your
+        own text in each face.
       </p>
+      <input
+        className="set-input font-preview-input"
+        value={preview}
+        onChange={(e) => setPreview(e.target.value)}
+        placeholder={FONT_SAMPLE_DEFAULT}
+        aria-label="Preview text"
+        spellCheck={false}
+      />
       <div className="font-pick">
         {UI_FONTS.map((f) => {
           const active = uiFont === f.id;
@@ -94,7 +109,7 @@ function AppearancePane() {
                 <span className="font-opt-check">{active && <Ic.check size={14} strokeWidth={2.6} />}</span>
               </div>
               <div className="font-opt-sample" style={{ fontFamily: f.stack }}>
-                Trạng thái · mỗi luồng — 12.840₫
+                {sample}
               </div>
               <div className="font-opt-note">{f.note}</div>
             </button>
