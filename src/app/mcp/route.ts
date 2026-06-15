@@ -12,6 +12,7 @@ import {
   milestoneService,
   moduleService,
   commentService,
+  workspaceService,
 } from '@/server/services';
 import { requireBearer, MCP_COMMENT_SOURCE } from '@/server/auth/token';
 import { ServiceError } from '@/server/services';
@@ -348,6 +349,9 @@ const TOOLS: Tool[] = [
           shortDesc: a.short_desc,
           statusNote: a.status_note,
           description: a.description,
+          // Anchor MCP-created projects to the default workspace so they stay
+          // visible once the sidebar filters projects by active workspace.
+          workspaceId: (await workspaceService.getDefault())?.id ?? null,
         }),
       ),
   },

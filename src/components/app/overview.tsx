@@ -64,6 +64,13 @@ interface Project {
   shortDesc: string | null;
   statusNote: string | null;
   description: string | null;
+  workspaceId: string | null;
+}
+
+interface WorkspaceOpt {
+  id: string;
+  name: string;
+  emoji: string | null;
 }
 
 type OvTab = 'info' | 'milestones' | 'modules';
@@ -73,11 +80,13 @@ export function OverviewScreen({
   modules,
   milestones,
   tasks,
+  workspaces,
 }: {
   project: Project;
   modules: GroupModule[];
   milestones: GroupMilestone[];
   tasks: TaskDto[];
+  workspaces: WorkspaceOpt[];
 }) {
   const [tab, setTab] = useState<OvTab>('info');
   const views = useViews(project.key);
@@ -110,7 +119,7 @@ export function OverviewScreen({
           </nav>
 
           <div className="ov-vpanel">
-            {tab === 'info' && <InfoPanel project={project} />}
+            {tab === 'info' && <InfoPanel project={project} workspaces={workspaces} />}
             {tab === 'milestones' && <MilestonesPanel projectId={project.id} milestones={milestones} tasks={tasks} />}
             {tab === 'modules' && <ModulesPanel projectId={project.id} modules={modules} tasks={tasks} />}
           </div>
@@ -121,12 +130,13 @@ export function OverviewScreen({
 }
 
 // ---------------------------------------------------------------- Info panel
-function InfoPanel({ project }: { project: Project }) {
+function InfoPanel({ project, workspaces }: { project: Project; workspaces: WorkspaceOpt[] }) {
   const router = useRouter();
   const save = async (patch: Parameters<typeof updateProject>[1]) => {
     await updateProject(project.id, patch);
     router.refresh();
   };
+  const currentWs = workspaces.find((w) => w.id === project.workspaceId) ?? null;
   return (
     <>
       <div className="ov-grid">
@@ -177,6 +187,45 @@ function InfoPanel({ project }: { project: Project }) {
           placeholder="Where is this project right now?"
           onBlur={(e) => e.target.value !== (project.statusNote ?? '') && save({ statusNote: e.target.value || null })}
         />
+
+        {workspaces.length > 0 && (
+          <>
+            <span className="ov-label">Workspace</span>
+            <span>
+              <Popover
+                width={220}
+                trigger={
+                  <button className="ov-pickbtn" type="button">
+                    <span className="pstatus">
+                      <span>{currentWs?.emoji ?? '◈'}</span>
+                      {currentWs?.name ?? 'No workspace'}
+                    </span>
+                  </button>
+                }
+              >
+                {(close) => (
+                  <OptionList
+                    options={workspaces.map((w) => ({ id: w.id, label: w.name }))}
+                    value={project.workspaceId ?? ''}
+                    onPick={(id) => {
+                      if (id !== project.workspaceId) save({ workspaceId: id });
+                      close();
+                    }}
+                    renderOpt={(o) => {
+                      const ws = workspaces.find((w) => w.id === o.id);
+                      return (
+                        <>
+                          <span>{ws?.emoji ?? '◈'}</span>
+                          {o.label}
+                        </>
+                      );
+                    }}
+                  />
+                )}
+              </Popover>
+            </span>
+          </>
+        )}
 
         <span className="ov-label">Prefix</span>
         <input className="ov-input ov-key" value={project.key} readOnly />

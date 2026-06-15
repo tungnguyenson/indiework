@@ -6,29 +6,30 @@ import '@/styles/app.css';
 import '@/styles/screens.css';
 import { FONT_STACK, UI_FONT_DEFAULT, UI_FONT_STORAGE_KEY } from '@/lib/fonts';
 
-// Default UI face — purpose-built for Vietnamese. Static family, so weights are
-// pinned (400/500/600/700, plus 800 for the wordmark). Preloaded as the
+// Default UI face — a neutral grotesque with a variable weight axis (so the
+// wordmark's 800 and every UI weight render from one file). Preloaded as the
 // app-wide default.
+const hanken = Hanken_Grotesk({
+  subsets: ['latin', 'latin-ext', 'vietnamese'],
+  variable: '--font-hanken',
+  display: 'swap',
+});
+
+// Alternates offered in App Settings → Appearance. We skip preloading — only the
+// active face is fetched on routes other than Settings. Be Vietnam Pro is a
+// static family, so its weights are pinned (400/500/600/700, plus 800 for the
+// wordmark); Plus Jakarta Sans exposes a variable axis, so one file covers it.
 const beVietnamPro = Be_Vietnam_Pro({
   subsets: ['latin', 'latin-ext', 'vietnamese'],
   weight: ['400', '500', '600', '700', '800'],
   variable: '--font-be-vietnam-pro',
   display: 'swap',
-});
-
-// Alternates offered in App Settings → Appearance. Both expose a variable axis,
-// so we load a single variable file each and skip preloading — only the active
-// face is fetched on routes other than Settings.
-const plusJakarta = Plus_Jakarta_Sans({
-  subsets: ['latin', 'latin-ext', 'vietnamese'],
-  variable: '--font-plus-jakarta',
-  display: 'swap',
   preload: false,
 });
 
-const hanken = Hanken_Grotesk({
+const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin', 'latin-ext', 'vietnamese'],
-  variable: '--font-hanken',
+  variable: '--font-plus-jakarta',
   display: 'swap',
   preload: false,
 });
@@ -58,8 +59,11 @@ const fontBootScript = `(function(){try{var m=${JSON.stringify(FONT_STACK)},v=lo
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const fontVars = `${beVietnamPro.variable} ${plusJakarta.variable} ${hanken.variable} ${plexMono.variable}`;
+  // fontBootScript sets --font-ui on <html> before hydration, so the element's
+  // style attribute legitimately differs from the server markup — suppress the
+  // one-level hydration diff for <html> only.
   return (
-    <html lang="en" className={fontVars} data-theme="light">
+    <html lang="en" className={fontVars} data-theme="light" suppressHydrationWarning>
       <body>
         <script dangerouslySetInnerHTML={{ __html: fontBootScript }} />
         {children}

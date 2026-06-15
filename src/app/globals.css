@@ -2,8 +2,8 @@
 
 /* Map the design tokens' font slots onto the next/font CSS variables. This is
    the single owner of --font-ui; the Appearance picker overrides it live on
-   <html>. Default = Be Vietnam Pro (Vietnamese-complete). */
+   <html>. Default = Hanken Grotesk (Vietnamese-complete). */
 :root {
-  --font-ui: var(--font-be-vietnam-pro), ui-sans-serif, system-ui, sans-serif;
+  --font-ui: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, 'SFMono-Regular', monospace;
 }

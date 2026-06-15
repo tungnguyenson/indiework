@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { db, schema } from '@/server/db';
 import {
   createProjectSchema,
@@ -29,11 +29,33 @@ async function withCounts<T extends { id: string }>(rows: T[]) {
 }
 
 export const projectService = {
-  async list({ includeArchived = false } = {}) {
+  /**
+   * List projects, newest-relevant first. Pass `workspaceId` to scope to one
+   * workspace; with `includeNullWorkspace` (used for the default workspace),
+   * legacy projects with no workspace are folded in so they never disappear.
+   */
+  async list({
+    includeArchived = false,
+    workspaceId,
+    includeNullWorkspace = false,
+  }: {
+    includeArchived?: boolean;
+    workspaceId?: string | null;
+    includeNullWorkspace?: boolean;
+  } = {}) {
+    const conds = [];
+    if (!includeArchived) conds.push(isNull(schema.projects.archivedAt));
+    if (workspaceId != null) {
+      conds.push(
+        includeNullWorkspace
+          ? or(eq(schema.projects.workspaceId, workspaceId), isNull(schema.projects.workspaceId))
+          : eq(schema.projects.workspaceId, workspaceId),
+      );
+    }
     const rows = await db
       .select()
       .from(schema.projects)
-      .where(includeArchived ? undefined : isNull(schema.projects.archivedAt))
+      .where(conds.length ? and(...conds) : undefined)
       .orderBy(schema.projects.createdAt);
     return withCounts(rows);
   },

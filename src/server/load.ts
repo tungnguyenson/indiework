@@ -3,22 +3,22 @@
  * components (layouts/pages). Not server actions; they only read.
  */
 import {
-  workspaceService,
   projectService,
   moduleService,
   milestoneService,
   taskService,
 } from '@/server/services';
+import { resolveActiveWorkspace } from '@/server/active-workspace';
 
 export async function loadShell() {
-  const [workspaces, projects, inbox] = await Promise.all([
-    workspaceService.list(),
-    projectService.list(),
+  const { workspaces, active, isDefault } = await resolveActiveWorkspace();
+  const [projects, inbox] = await Promise.all([
+    projectService.list({ workspaceId: active?.id ?? null, includeNullWorkspace: isDefault }),
     taskService.listInbox(),
   ]);
   return {
     workspaces,
-    activeWorkspace: workspaces[0] ?? null,
+    activeWorkspace: active,
     projects,
     inboxCount: inbox.length,
   };

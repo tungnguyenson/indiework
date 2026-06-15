@@ -18,6 +18,9 @@ export function WorkspaceForm({ onClose }: { onClose: () => void }) {
     setBusy(true);
     try {
       await createWorkspace({ name: name.trim(), emoji, tagline: tagline.trim() || null });
+      // New workspace is now active and empty — land on the app home, not a
+      // project page that belongs to the previous workspace.
+      router.push('/app');
       router.refresh();
       onClose();
     } finally {

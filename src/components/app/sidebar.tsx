@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import type { ShellData } from '@/server/load';
 import { PROJECT_STATUS, PROJECT_STATUS_LABEL, type ProjectStatus } from '@/lib/domain';
+import { setActiveWorkspace } from '@/app/_actions/workspace';
 import { Popover } from '@/components/ui/popover';
 import { Ic } from '@/components/ui/icons';
 
@@ -26,7 +27,17 @@ export function Sidebar({
   onCollapse?: () => void;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { workspaces, activeWorkspace, projects, inboxCount } = shell;
+
+  const switchWorkspace = async (id: string) => {
+    if (id === activeWorkspace?.id) return;
+    await setActiveWorkspace(id);
+    // Leaving a project page: that project may not live in the new workspace,
+    // so land on the app home instead of staring at an out-of-scope project.
+    if (pathname.startsWith('/app/p/')) router.push('/app');
+    else router.refresh();
+  };
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set(DEFAULT_COLLAPSED));
 
   const groups = useMemo(() => buildGroups(projects), [projects]);
@@ -70,7 +81,10 @@ export function Sidebar({
                 key={w.id}
                 className="ws-opt"
                 data-active={w.id === activeWorkspace?.id ? '' : undefined}
-                onClick={close}
+                onClick={() => {
+                  close();
+                  void switchWorkspace(w.id);
+                }}
                 type="button"
               >
                 <span className="ws-brand" style={{ width: 26, height: 26 }}>

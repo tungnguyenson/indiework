@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { ServiceError } from '@/server/services';
+import { ServiceError, workspaceService } from '@/server/services';
 import { loadProject } from '@/server/load';
 import { OverviewScreen } from '@/components/app/overview';
 
@@ -12,8 +12,19 @@ export default async function ProjectOverviewPage({
 }) {
   const { projectKey } = await params;
   try {
-    const { project, modules, milestones, tasks } = await loadProject(projectKey);
-    return <OverviewScreen project={project} modules={modules} milestones={milestones} tasks={tasks} />;
+    const [{ project, modules, milestones, tasks }, workspaces] = await Promise.all([
+      loadProject(projectKey),
+      workspaceService.list(),
+    ]);
+    return (
+      <OverviewScreen
+        project={project}
+        modules={modules}
+        milestones={milestones}
+        tasks={tasks}
+        workspaces={workspaces}
+      />
+    );
   } catch (e) {
     if (e instanceof ServiceError && e.code === 'not_found') notFound();
     throw e;

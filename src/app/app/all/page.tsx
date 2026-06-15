@@ -1,9 +1,14 @@
 import { projectService } from '@/server/services';
+import { resolveActiveWorkspace } from '@/server/active-workspace';
 import { AllProjectsScreen } from '@/components/app/all-projects';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AllProjectsPage() {
-  const projects = await projectService.list();
+  const { active, isDefault } = await resolveActiveWorkspace();
+  const projects = await projectService.list({
+    workspaceId: active?.id ?? null,
+    includeNullWorkspace: isDefault,
+  });
   return <AllProjectsScreen projects={projects} />;
 }
