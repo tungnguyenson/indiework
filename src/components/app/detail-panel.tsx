@@ -72,7 +72,8 @@ export function DetailPanel({ taskId, onClose }: { taskId: string; onClose: () =
   }
 
   const { task, comments, modules, milestones } = detail;
-  const blocked = task.status === 'blocked';
+  // NOTE: Phase 1 renames this to `pending` + redesigns the status note.
+  const blocked = task.status === 'pending';
   const moduleName = modules.find((m) => m.id === task.moduleId)?.name;
   const moduleColor = modules.find((m) => m.id === task.moduleId)?.color;
   const milestoneName = milestones.find((m) => m.id === task.milestoneId)?.name;

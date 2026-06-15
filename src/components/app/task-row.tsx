@@ -60,7 +60,7 @@ export function TaskRow({
           <span className="task-title">{task.title}</span>
           {task.ref && <span className="task-ref">{task.ref}</span>}
         </div>
-        {task.status === 'blocked' && task.statusNote && (
+        {task.status === 'pending' && task.statusNote && (
           <div className="task-note-2nd">
             <Ic.bolt size={12} />
             <span>{task.statusNote}</span>

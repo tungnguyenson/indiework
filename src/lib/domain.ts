@@ -13,7 +13,8 @@ export const TASK_STATUS = [
   'backlog', // not planned yet
   'todo', // will do
   'in_progress', // doing now
-  'blocked', // stuck (pairs with status_note)
+  'in_review', // up for review (violet)
+  'pending', // waiting on something (amber; pairs with status_note)
   'done', // finished
   'cancelled', // dropped
 ] as const;
@@ -21,6 +22,9 @@ export const TASK_STATUS = [
 export const TASK_PRIORITY = ['none', 'low', 'medium', 'high', 'urgent'] as const;
 
 export const MILESTONE_STATUS = ['planned', 'active', 'done'] as const;
+
+/** Module lifecycle (sub-system status). Each maps to a status color key below. */
+export const MODULE_STATE = ['planned', 'active', 'done', 'archived'] as const;
 
 /** Lifecycle of a whole project (drives the sidebar grouping). */
 export const PROJECT_STATUS = [
@@ -41,13 +45,50 @@ export const COMMENT_SOURCE = [
 
 export const API_KEY_SCOPE = ['read', 'write', 'read-write'] as const;
 
-/** Board (kanban) columns — a subset of task status. */
+/** Attachment kind — drives thumbnail vs file-tile rendering (v3). */
+export const ATTACHMENT_TYPE = ['file', 'image'] as const;
+
+/** Board (kanban) default columns — a subset of task status (v3). */
 export const BOARD_COLUMNS = [
-  'backlog',
   'todo',
   'in_progress',
-  'blocked',
+  'pending',
+  'in_review',
   'done',
+] as const;
+
+/**
+ * Order status *groups* render in when the list is grouped by status —
+ * active work first. Excludes `inbox` (Inbox is its own route, not a group).
+ */
+export const DEFAULT_STATUS_ORDER = [
+  'in_progress',
+  'in_review',
+  'pending',
+  'todo',
+  'backlog',
+  'done',
+  'cancelled',
+] as const;
+
+/** Curated icon pick-list for modules (keys into the icon set). */
+export const MODULE_ICONS = [
+  'cube',
+  'layers',
+  'bolt',
+  'sparkle',
+  'globe',
+  'folder',
+  'board',
+  'table',
+  'settings',
+  'search',
+  'target',
+  'key',
+  'tag',
+  'inbox',
+  'lock',
+  'sliders',
 ] as const;
 
 // ---- Derived TS union types ----
@@ -55,9 +96,12 @@ export const BOARD_COLUMNS = [
 export type TaskStatus = (typeof TASK_STATUS)[number];
 export type TaskPriority = (typeof TASK_PRIORITY)[number];
 export type MilestoneStatus = (typeof MILESTONE_STATUS)[number];
+export type ModuleState = (typeof MODULE_STATE)[number];
+export type ModuleIcon = (typeof MODULE_ICONS)[number];
 export type ProjectStatus = (typeof PROJECT_STATUS)[number];
 export type CommentSource = (typeof COMMENT_SOURCE)[number];
 export type ApiKeyScope = (typeof API_KEY_SCOPE)[number];
+export type AttachmentType = (typeof ATTACHMENT_TYPE)[number];
 
 // ---- Defaults ----
 
@@ -65,6 +109,7 @@ export const DEFAULT_TASK_STATUS: TaskStatus = 'backlog';
 export const DEFAULT_TASK_PRIORITY: TaskPriority = 'none';
 export const DEFAULT_MILESTONE_STATUS: MilestoneStatus = 'planned';
 export const DEFAULT_PROJECT_STATUS: ProjectStatus = 'active';
+export const DEFAULT_MODULE_STATE: ModuleState = 'active';
 
 // ---- Display metadata (labels for the UI; colors live in tokens.css) ----
 
@@ -73,7 +118,8 @@ export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   backlog: 'Backlog',
   todo: 'Todo',
   in_progress: 'In progress',
-  blocked: 'Blocked',
+  in_review: 'In review',
+  pending: 'Pending',
   done: 'Done',
   cancelled: 'Cancelled',
 };
@@ -98,6 +144,21 @@ export const MILESTONE_STATUS_LABEL: Record<MilestoneStatus, string> = {
   planned: 'Planned',
   active: 'Active',
   done: 'Done',
+};
+
+export const MODULE_STATE_LABEL: Record<ModuleState, string> = {
+  planned: 'Planned',
+  active: 'Active',
+  done: 'Done',
+  archived: 'Archived',
+};
+
+/** Module state → status color key, so chips reuse the status palette (--st-*). */
+export const MODULE_STATE_COLOR_KEY: Record<ModuleState, TaskStatus> = {
+  planned: 'backlog',
+  active: 'in_progress',
+  done: 'done',
+  archived: 'cancelled',
 };
 
 /** Project lifecycle status → display label + the sidebar group it sorts into. */

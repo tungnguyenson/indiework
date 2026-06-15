@@ -5,6 +5,7 @@ import { TASK_STATUS, TASK_PRIORITY } from '@/lib/domain';
 export const createTaskSchema = z.object({
   title: z.string().trim().min(1, 'title is required').max(500),
   projectId: z.uuid().nullish(),
+  parentId: z.uuid().nullish(), // set → this is a one-level sub-task
   moduleId: z.uuid().nullish(),
   milestoneId: z.uuid().nullish(),
   status: z.enum(TASK_STATUS).optional(),

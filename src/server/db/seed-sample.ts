@@ -26,8 +26,26 @@ async function main() {
   });
   const pid = project.id;
 
-  const core = (await moduleService.create({ projectId: pid, name: 'Core UI', color: '#4C8DFF' })).id;
-  const content = (await moduleService.create({ projectId: pid, name: 'Content', color: '#34BE9A' })).id;
+  const core = (
+    await moduleService.create({
+      projectId: pid,
+      name: 'Core UI',
+      color: '#4C8DFF',
+      icon: 'board',
+      state: 'active',
+      description: 'Hero, layout shell, and the design-token system.',
+    })
+  ).id;
+  const content = (
+    await moduleService.create({
+      projectId: pid,
+      name: 'Content',
+      color: '#34BE9A',
+      icon: 'folder',
+      state: 'planned',
+      description: 'Copy, docs, and marketing pages.',
+    })
+  ).id;
 
   const p1 = (
     await milestoneService.create({
@@ -53,11 +71,18 @@ async function main() {
   await T({ title: 'Build the bento feature grid', status: 'in_progress', priority: 'high', moduleId: core, milestoneId: p2 });
   await T({
     title: 'Ship the pricing page',
-    status: 'blocked',
+    status: 'pending',
     priority: 'urgent',
     moduleId: core,
     milestoneId: p2,
     statusNote: 'Waiting on final pricing tiers from the spreadsheet.',
+  });
+  await T({
+    title: 'Review the hero animation timing',
+    status: 'in_review',
+    priority: 'medium',
+    moduleId: core,
+    milestoneId: p2,
   });
   await T({ title: 'Write the launch build-log post', status: 'todo', priority: 'low', moduleId: content, milestoneId: p2 });
   await T({ title: 'Draft the FAQ copy', status: 'backlog', priority: 'none', moduleId: content });

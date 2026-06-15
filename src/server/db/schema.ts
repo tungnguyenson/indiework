@@ -18,17 +18,21 @@ import {
   timestamp,
   index,
   uniqueIndex,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import {
   TASK_STATUS,
   TASK_PRIORITY,
   MILESTONE_STATUS,
+  MODULE_STATE,
   PROJECT_STATUS,
   COMMENT_SOURCE,
   API_KEY_SCOPE,
+  ATTACHMENT_TYPE,
   DEFAULT_TASK_STATUS,
   DEFAULT_TASK_PRIORITY,
   DEFAULT_MILESTONE_STATUS,
+  DEFAULT_MODULE_STATE,
   DEFAULT_PROJECT_STATUS,
 } from '@/lib/domain';
 
@@ -113,6 +117,9 @@ export const modules = pgTable(
       .references(() => projects.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     color: text('color'),
+    icon: text('icon'), // key into the icon set (MODULE_ICONS)
+    state: text('state', { enum: MODULE_STATE }).notNull().default(DEFAULT_MODULE_STATE),
+    description: text('description'), // one-line "what does this module cover?"
     position: integer('position').notNull().default(0),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     ...timestamps,
@@ -127,6 +134,11 @@ export const tasks = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     // project_id NULL = Inbox (not yet triaged)
     projectId: uuid('project_id').references(() => projects.id, {
+      onDelete: 'cascade',
+    }),
+    // parent_id NULL = top-level task; otherwise a one-level sub-task (deleting
+    // a parent cascades to its children).
+    parentId: uuid('parent_id').references((): AnyPgColumn => tasks.id, {
       onDelete: 'cascade',
     }),
     moduleId: uuid('module_id').references(() => modules.id, {
@@ -155,7 +167,27 @@ export const tasks = pgTable(
     index('tasks_project_status_idx').on(t.projectId, t.status),
     index('tasks_module_idx').on(t.moduleId),
     index('tasks_milestone_idx').on(t.milestoneId),
+    index('tasks_parent_idx').on(t.parentId),
   ],
+);
+
+// ---- attachments (files + images on a task; storage path is wired later) ----
+export const attachments = pgTable(
+  'attachments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    taskId: uuid('task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    type: text('type', { enum: ATTACHMENT_TYPE }).notNull().default('file'),
+    size: text('size'), // human-readable, e.g. "4.2 KB"
+    ext: text('ext'), // file extension, drives the per-type hue
+    path: text('path'), // storage path — NULL until upload wiring lands (deferred)
+    url: text('url'), // object URL for live-added images; absent for stored files
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('attachments_task_idx').on(t.taskId)],
 );
 
 // ---- comments (= timeline / journal, append-only) ----

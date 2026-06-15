@@ -92,7 +92,9 @@
 }
 
 /* ===================== STATUS palette ===================== */
-/* calm tints; Blocked stands out; Done/Cancelled cooled down */
+/* 8 states (v3): In review = violet, Pending = amber; Done/Cancelled cooled.
+   --st-danger is a destructive-action red, NOT a status. Legacy --st-blocked
+   is kept as an alias of --st-danger so older rules don't break. */
 :root {
   --st-inbox:       oklch(0.55 0.10 290);
   --st-inbox-bg:    oklch(0.95 0.03 290);
@@ -102,12 +104,20 @@
   --st-todo-bg:     oklch(0.95 0.03 245);
   --st-in_progress: oklch(0.58 0.12 215);
   --st-in_progress-bg: oklch(0.95 0.035 215);
-  --st-blocked:     oklch(0.58 0.16 32);
-  --st-blocked-bg:  oklch(0.945 0.04 38);
+  --st-in_review:   oklch(0.56 0.14 305);
+  --st-in_review-bg: oklch(0.95 0.04 305);
+  --st-pending:     oklch(0.64 0.13 73);
+  --st-pending-bg:  oklch(0.95 0.05 78);
   --st-done:        oklch(0.60 0.10 158);
   --st-done-bg:     oklch(0.95 0.035 158);
   --st-cancelled:   oklch(0.62 0.008 250);
   --st-cancelled-bg: oklch(0.95 0.004 250);
+
+  --st-danger:      oklch(0.58 0.16 32);
+  --st-danger-bg:   oklch(0.945 0.04 38);
+  /* legacy aliases — some rules still reference --st-blocked */
+  --st-blocked:     var(--st-danger);
+  --st-blocked-bg:  var(--st-danger-bg);
 }
 [data-theme="dark"] {
   --st-inbox-bg:    oklch(0.34 0.06 290);
@@ -118,12 +128,16 @@
   --st-todo:        oklch(0.82 0.08 245);
   --st-in_progress-bg: oklch(0.34 0.07 215);
   --st-in_progress: oklch(0.83 0.09 215);
-  --st-blocked-bg:  oklch(0.38 0.09 35);
-  --st-blocked:     oklch(0.83 0.11 38);
+  --st-in_review-bg: oklch(0.35 0.07 305);
+  --st-in_review:   oklch(0.82 0.10 305);
+  --st-pending-bg:  oklch(0.37 0.06 75);
+  --st-pending:     oklch(0.84 0.11 80);
   --st-done-bg:     oklch(0.34 0.06 158);
   --st-done:        oklch(0.82 0.08 158);
   --st-cancelled-bg: oklch(0.32 0.006 250);
   --st-cancelled:   oklch(0.70 0.008 250);
+  --st-danger-bg:   oklch(0.38 0.09 35);
+  --st-danger:      oklch(0.83 0.11 38);
 }
 
 /* ===================== PRIORITY palette ===================== */
