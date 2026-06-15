@@ -56,6 +56,41 @@ const requireProjectId = async (key: unknown): Promise<string> => {
   return (await projectService.getByKey(key)).id;
 };
 
+/** Format a thrown validation/service error into a one-line message for clients. */
+function formatError(e: unknown): string {
+  if (e instanceof ZodError)
+    return e.issues.map((i) => `${i.path.join('.') || 'input'}: ${i.message}`).join('; ');
+  if (e instanceof ServiceError) return e.message;
+  return 'Tool execution failed';
+}
+
+// Slim projections for write results: a mutation only needs to hand back the
+// addressable handle (ref/id) plus a human-readable label to confirm the write,
+// not the whole row echoed verbatim. Reads (get_*/list_*) keep the full object.
+const slimTask = (t: { ref: string | null; id: string; title: string; status: string }) => ({
+  ref: t.ref,
+  id: t.id,
+  title: t.title,
+  status: t.status,
+});
+const slimProject = (p: { key: string; id: string; name: string; status: string }) => ({
+  key: p.key,
+  id: p.id,
+  name: p.name,
+  status: p.status,
+});
+const slimMilestone = (m: { id: string; name: string; status: string }) => ({
+  id: m.id,
+  name: m.name,
+  status: m.status,
+});
+const slimModule = (m: { id: string; name: string; state: string }) => ({
+  id: m.id,
+  name: m.name,
+  state: m.state,
+});
+const slimComment = (c: { id: string; source: string }) => ({ id: c.id, source: c.source });
+
 const TOOLS: Tool[] = [
   {
     name: 'create_task',
@@ -74,25 +109,83 @@ const TOOLS: Tool[] = [
       required: ['title'],
     },
     run: async (a) =>
-      taskService.create({
-        title: a.title as string,
-        projectId: await projectIdFromKey(a.project),
-        moduleId: (a.module as string) ?? undefined,
-        milestoneId: (a.milestone as string) ?? undefined,
-        status: a.status as never,
-        priority: a.priority as never,
-        dueDate: a.due_date ? new Date(a.due_date as string) : undefined,
-      }),
+      slimTask(
+        await taskService.create({
+          title: a.title as string,
+          projectId: await projectIdFromKey(a.project),
+          moduleId: (a.module as string) ?? undefined,
+          milestoneId: (a.milestone as string) ?? undefined,
+          status: a.status as never,
+          priority: a.priority as never,
+          dueDate: a.due_date ? new Date(a.due_date as string) : undefined,
+        }),
+      ),
+  },
+  {
+    name: 'create_tasks',
+    description:
+      'Bulk-create tasks in one call. `project` (a project KEY) applies to every item; omit it to drop them all into the Inbox. Returns one result per item, in order: { ok: true, ref, id } or { ok: false, error }. One bad item does not abort the rest.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project: str(),
+        tasks: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              title: str(),
+              module: str(),
+              milestone: str(),
+              status: { type: 'string', enum: [...TASK_STATUS] },
+              priority: { type: 'string', enum: [...TASK_PRIORITY] },
+              due_date: { ...str(), description: 'ISO date, e.g. 2026-07-15' },
+            },
+            required: ['title'],
+          },
+        },
+      },
+      required: ['tasks'],
+    },
+    run: async (a) => {
+      const projectId = await projectIdFromKey(a.project);
+      const items = Array.isArray(a.tasks) ? (a.tasks as Json[]) : [];
+      const results: Array<
+        { ok: true; ref: string | null; id: string } | { ok: false; error: string }
+      > = [];
+      for (const it of items) {
+        try {
+          const t = await taskService.create({
+            title: it.title as string,
+            projectId,
+            moduleId: (it.module as string) ?? undefined,
+            milestoneId: (it.milestone as string) ?? undefined,
+            status: it.status as never,
+            priority: it.priority as never,
+            dueDate: it.due_date ? new Date(it.due_date as string) : undefined,
+          });
+          results.push({ ok: true, ref: t.ref, id: t.id });
+        } catch (e) {
+          results.push({ ok: false, error: formatError(e) });
+        }
+      }
+      return results;
+    },
   },
   {
     name: 'add_subtask',
-    description: 'Add a sub-task (one level) under a parent task. `parent_ref` is the parent ref, e.g. "SITE-3". Inherits the parent project/module/milestone.',
+    description: 'Add a sub-task (one level) under a parent task. `parent_ref` is the parent ref, e.g. "SITE-3". Inherits the parent project/module/milestone and gets its own ref (e.g. "SITE-15"). Optional `status` (defaults to "todo").',
     inputSchema: {
       type: 'object',
-      properties: { parent_ref: str(), title: str() },
+      properties: {
+        parent_ref: str(),
+        title: str(),
+        status: { type: 'string', enum: [...TASK_STATUS], description: 'inbox·backlog·todo·in_progress·in_review·pending·done·cancelled' },
+      },
       required: ['parent_ref', 'title'],
     },
-    run: async (a) => taskService.addSubtask(await idFromRef(a.parent_ref), a.title as string),
+    run: async (a) =>
+      slimTask(await taskService.addSubtask(await idFromRef(a.parent_ref), a.title as string, a.status as never)),
   },
   {
     name: 'list_tasks',
@@ -102,18 +195,24 @@ const TOOLS: Tool[] = [
       properties: { project: str(), status: { type: 'string', enum: [...TASK_STATUS] }, milestone: str(), module: str() },
     },
     run: async (a) =>
-      taskService.list({
-        projectId: await projectIdFromKey(a.project),
-        status: a.status ? [a.status as never] : undefined,
-        milestoneId: (a.milestone as string) ?? undefined,
-        moduleId: (a.module as string) ?? undefined,
-      }),
+      (
+        await taskService.list({
+          projectId: await projectIdFromKey(a.project),
+          status: a.status ? [a.status as never] : undefined,
+          milestoneId: (a.milestone as string) ?? undefined,
+          moduleId: (a.module as string) ?? undefined,
+        })
+      ).filter((t) => !t.parentId), // root tasks only; sub-tasks are reached via get_task
   },
   {
     name: 'get_task',
-    description: 'Get one task by its ref, e.g. "SITE-3".',
+    description: 'Get one task by its ref, e.g. "SITE-3". Returns the task plus its `children` (sub-tasks, each with its own ref + status).',
     inputSchema: { type: 'object', properties: { ref: str() }, required: ['ref'] },
-    run: async (a) => taskService.getByRef(a.ref as string),
+    run: async (a) => {
+      const task = await taskService.getByRef(a.ref as string);
+      const children = await taskService.listChildren(task.id);
+      return { ...task, children: children.map(slimTask) };
+    },
   },
   {
     name: 'update_task',
@@ -123,7 +222,43 @@ const TOOLS: Tool[] = [
       properties: { ref: str(), patch: { type: 'object' } },
       required: ['ref', 'patch'],
     },
-    run: async (a) => taskService.update(await idFromRef(a.ref), (a.patch as Json) ?? {}),
+    run: async (a) =>
+      slimTask(await taskService.update(await idFromRef(a.ref), (a.patch as Json) ?? {})),
+  },
+  {
+    name: 'update_tasks',
+    description:
+      'Bulk-patch tasks in one call. `updates` is a list of { ref, patch }; each `patch` uses camelCase keys (title, status, priority, moduleId, milestoneId, dueDate, statusNote, description). Returns one result per item, in order: { ok: true, ref } or { ok: false, ref, error }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        updates: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: { ref: str(), patch: { type: 'object' } },
+            required: ['ref', 'patch'],
+          },
+        },
+      },
+      required: ['updates'],
+    },
+    run: async (a) => {
+      const items = Array.isArray(a.updates) ? (a.updates as Json[]) : [];
+      const results: Array<
+        { ok: true; ref: string | null } | { ok: false; ref: string | null; error: string }
+      > = [];
+      for (const it of items) {
+        const ref = typeof it.ref === 'string' ? it.ref : null;
+        try {
+          const t = await taskService.update(await idFromRef(it.ref), (it.patch as Json) ?? {});
+          results.push({ ok: true, ref: t.ref });
+        } catch (e) {
+          results.push({ ok: false, ref, error: formatError(e) });
+        }
+      }
+      return results;
+    },
   },
   {
     name: 'add_comment',
@@ -134,7 +269,12 @@ const TOOLS: Tool[] = [
       required: ['ref', 'body'],
     },
     run: async (a) =>
-      commentService.add({ taskId: await idFromRef(a.ref), body: a.body as string }, MCP_COMMENT_SOURCE),
+      slimComment(
+        await commentService.add(
+          { taskId: await idFromRef(a.ref), body: a.body as string },
+          MCP_COMMENT_SOURCE,
+        ),
+      ),
   },
   {
     name: 'set_status_note',
@@ -144,7 +284,8 @@ const TOOLS: Tool[] = [
       properties: { ref: str(), note: str() },
       required: ['ref', 'note'],
     },
-    run: async (a) => taskService.setStatusNote(await idFromRef(a.ref), { note: a.note as string }),
+    run: async (a) =>
+      slimTask(await taskService.setStatusNote(await idFromRef(a.ref), { note: a.note as string })),
   },
   {
     name: 'list_projects',
@@ -195,18 +336,20 @@ const TOOLS: Tool[] = [
       required: ['key', 'name'],
     },
     run: async (a) =>
-      projectService.create({
-        key: a.key,
-        name: a.name,
-        emoji: a.emoji,
-        color: a.color,
-        status: a.status,
-        pinned: a.pinned,
-        tags: a.tags,
-        shortDesc: a.short_desc,
-        statusNote: a.status_note,
-        description: a.description,
-      }),
+      slimProject(
+        await projectService.create({
+          key: a.key,
+          name: a.name,
+          emoji: a.emoji,
+          color: a.color,
+          status: a.status,
+          pinned: a.pinned,
+          tags: a.tags,
+          shortDesc: a.short_desc,
+          statusNote: a.status_note,
+          description: a.description,
+        }),
+      ),
   },
   {
     name: 'update_project',
@@ -217,14 +360,15 @@ const TOOLS: Tool[] = [
       properties: { project: str(), patch: { type: 'object' } },
       required: ['project', 'patch'],
     },
-    run: async (a) => projectService.update(await requireProjectId(a.project), (a.patch as Json) ?? {}),
+    run: async (a) =>
+      slimProject(await projectService.update(await requireProjectId(a.project), (a.patch as Json) ?? {})),
   },
   {
     name: 'archive_project',
     description:
       'Archive (soft-delete) a project by KEY. Reversible — sets archived_at and the data is retained. There is no hard delete.',
     inputSchema: { type: 'object', properties: { project: str() }, required: ['project'] },
-    run: async (a) => projectService.archive(await requireProjectId(a.project)),
+    run: async (a) => slimProject(await projectService.archive(await requireProjectId(a.project))),
   },
 
   // ---- Tasks (destructive) ----
@@ -252,14 +396,16 @@ const TOOLS: Tool[] = [
       required: ['project', 'name'],
     },
     run: async (a) =>
-      milestoneService.create({
-        projectId: await requireProjectId(a.project),
-        name: a.name,
-        description: a.description,
-        status: a.status,
-        targetDate: a.target_date,
-        position: a.position,
-      }),
+      slimMilestone(
+        await milestoneService.create({
+          projectId: await requireProjectId(a.project),
+          name: a.name,
+          description: a.description,
+          status: a.status,
+          targetDate: a.target_date,
+          position: a.position,
+        }),
+      ),
   },
   {
     name: 'update_milestone',
@@ -270,7 +416,7 @@ const TOOLS: Tool[] = [
       properties: { id: str(), patch: { type: 'object' } },
       required: ['id', 'patch'],
     },
-    run: async (a) => milestoneService.update(a.id as string, (a.patch as Json) ?? {}),
+    run: async (a) => slimMilestone(await milestoneService.update(a.id as string, (a.patch as Json) ?? {})),
   },
   {
     name: 'set_milestone_status',
@@ -280,7 +426,7 @@ const TOOLS: Tool[] = [
       properties: { id: str(), status: { type: 'string', enum: [...MILESTONE_STATUS] } },
       required: ['id', 'status'],
     },
-    run: async (a) => milestoneService.setStatus(a.id as string, a.status as never),
+    run: async (a) => slimMilestone(await milestoneService.setStatus(a.id as string, a.status as never)),
   },
   {
     name: 'remove_milestone',
@@ -319,15 +465,17 @@ const TOOLS: Tool[] = [
       required: ['project', 'name'],
     },
     run: async (a) =>
-      moduleService.create({
-        projectId: await requireProjectId(a.project),
-        name: a.name,
-        color: a.color,
-        icon: a.icon,
-        state: a.state,
-        description: a.description,
-        position: a.position,
-      }),
+      slimModule(
+        await moduleService.create({
+          projectId: await requireProjectId(a.project),
+          name: a.name,
+          color: a.color,
+          icon: a.icon,
+          state: a.state,
+          description: a.description,
+          position: a.position,
+        }),
+      ),
   },
   {
     name: 'update_module',
@@ -338,13 +486,13 @@ const TOOLS: Tool[] = [
       properties: { id: str(), patch: { type: 'object' } },
       required: ['id', 'patch'],
     },
-    run: async (a) => moduleService.update(a.id as string, (a.patch as Json) ?? {}),
+    run: async (a) => slimModule(await moduleService.update(a.id as string, (a.patch as Json) ?? {})),
   },
   {
     name: 'archive_module',
     description: 'Archive (soft-delete) a module by id. Reversible — sets archived_at.',
     inputSchema: { type: 'object', properties: { id: str() }, required: ['id'] },
-    run: async (a) => moduleService.archive(a.id as string),
+    run: async (a) => slimModule(await moduleService.archive(a.id as string)),
   },
   {
     name: 'reorder_modules',
@@ -393,13 +541,7 @@ async function handleMessage(msg: Json): Promise<Json | null> {
         const result = await tool.run((params?.arguments as Json) ?? {});
         return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
       } catch (e) {
-        const message =
-          e instanceof ZodError
-            ? e.issues.map((i) => `${i.path.join('.') || 'input'}: ${i.message}`).join('; ')
-            : e instanceof ServiceError
-              ? e.message
-              : 'Tool execution failed';
-        return rpcResult(id, { content: [{ type: 'text', text: message }], isError: true });
+        return rpcResult(id, { content: [{ type: 'text', text: formatError(e) }], isError: true });
       }
     }
     default:

@@ -120,7 +120,7 @@ export function TaskRow({
 
       {showSubtasks && hasChildren && (
         <div className="subtask-list">
-          {children.map((c, i) => (
+          {children.map((c) => (
             <div
               key={c.id}
               className="subtask-row"
@@ -141,7 +141,7 @@ export function TaskRow({
                 {c.done && <Ic.check size={9} strokeWidth={3} />}
               </button>
               <span className="subtask-title">{c.title}</span>
-              {task.ref && <span className="subtask-ref">{`${task.ref}.${i + 1}`}</span>}
+              {c.ref && <span className="subtask-ref">{c.ref}</span>}
             </div>
           ))}
         </div>

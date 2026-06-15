@@ -68,17 +68,25 @@ curl -s -X POST http://localhost:3000/mcp \
 
 ## Tools
 
-23 tools, each a thin wrapper over a service method. Grouped by what they touch.
+25 tools, each a thin wrapper over a service method. Grouped by what they touch.
+
+> **Write tools return a slim confirmation, not the full row.** `create_*` / `update_*` /
+> `add_subtask` / `set_*` / `archive_*` echo back just the handle (`ref` / `id` / `key`) plus a
+> label (`title`/`name`, `status`/`state`) — enough to confirm and address the write, without
+> spending tokens on every column. Fetch the full record with `get_task` / `get_project` when
+> you actually need it.
 
 ### Tasks
 
 | Tool | Required args | Optional args | Notes |
 |---|---|---|---|
 | `create_task` | `title` | `project`, `module`, `milestone`, `status`, `priority`, `due_date` | Omit `project` → lands in the Inbox. |
-| `add_subtask` | `parent_ref`, `title` | — | One level deep; inherits the parent's project/module/milestone. |
+| `create_tasks` | `tasks` | `project` | **Bulk create** in one call. `tasks` is an array of `create_task`-shaped items; `project` is the shared default KEY (omit → all Inbox). Returns one `{ ok, ref, id }` / `{ ok: false, error }` per item — one bad item doesn't abort the rest. |
+| `add_subtask` | `parent_ref`, `title` | `status` | One level deep; inherits the parent's project/module/milestone. Gets its own ref (`KEY-<n>`), so it's patchable like any task. `status` defaults to `todo`. |
 | `list_tasks` | — | `project`, `status`, `milestone`, `module` | Root tasks only; `status` is a single value. |
-| `get_task` | `ref` | — | e.g. `SITE-3`. |
+| `get_task` | `ref` | — | e.g. `SITE-3`. Returns the task plus its `children` (sub-tasks, each with its own ref + status) — use this to enumerate sub-tasks. |
 | `update_task` | `ref`, `patch` | — | `patch` may set `title`, `status`, `priority`, `moduleId`, `milestoneId`, `dueDate`, `statusNote`, `description`. |
+| `update_tasks` | `updates` | — | **Bulk patch** in one call. `updates` is an array of `{ ref, patch }` (same `patch` keys as `update_task`). Returns one `{ ok, ref }` / `{ ok: false, ref, error }` per item. |
 | `add_comment` | `ref`, `body` | — | Appended to the timeline with source `agent`. |
 | `set_status_note` | `ref`, `note` | — | Overwrites the pinned status note (what's blocking / where it is). |
 | `delete_task` | `ref` | — | **Hard delete — cannot be undone.** |
@@ -127,6 +135,13 @@ curl -s -X POST http://localhost:3000/mcp \
 
 ## Caveats
 
+- **Inbox tasks have no `ref` yet.** A task created without a `project` lands in the
+  Inbox with `ref: null` / `seq: null` — a per-project ref (`KEY-<n>`) is only
+  allocated when the task is **triaged into a project**. Until then the ref-based
+  tools (`get_task`, `update_task`, `add_comment`, `set_status_note`, `delete_task`)
+  can't address it, and they reject the raw uuid too. To get an addressable task
+  immediately, pass `project` on `create_task`; otherwise triage the Inbox task
+  (web UI) first.
 - **POST only.** `GET /mcp` returns `405` — the server is stateless and opens no
   server-initiated SSE stream. Clients that *require* an SSE/session handshake to
   connect may not work; plain tool calls over HTTP POST are fine.

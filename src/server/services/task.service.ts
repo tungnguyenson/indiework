@@ -6,7 +6,7 @@ import {
   listTasksSchema,
   setStatusNoteSchema,
 } from '@/server/validators/task';
-import { parseRef, TASK_PRIORITY_RANK, type TaskStatus } from '@/lib/domain';
+import { parseRef, TASK_STATUS, TASK_PRIORITY_RANK, type TaskStatus } from '@/lib/domain';
 import { toTaskDto, type TaskDto } from './dto';
 import { badRequest, notFound } from './errors';
 import { definedKeys } from './util';
@@ -44,8 +44,8 @@ export const taskService = {
   async create(input: unknown): Promise<TaskDto> {
     const data = createTaskSchema.parse(input);
     // A task with a parent is a sub-task — route through addSubtask (inherits
-    // the parent's project/module/milestone, no seq).
-    if (data.parentId) return this.addSubtask(data.parentId, data.title);
+    // the parent's project/module/milestone and allocates its own seq).
+    if (data.parentId) return this.addSubtask(data.parentId, data.title, data.status);
 
     const status: TaskStatus = data.status ?? (data.projectId ? 'todo' : 'inbox');
 
@@ -172,25 +172,54 @@ export const taskService = {
 
   /**
    * Add a sub-task to a parent (one level deep). Inherits the parent's project,
-   * module, and milestone; starts at status `todo`; no own seq (its public ref
-   * is the dot-notation "PARENT.N" derived from sibling order at read time).
+   * module, and milestone. A sub-task is a first-class task: it allocates its own
+   * per-project `seq`, so its public ref is the usual `KEY-<n>` (e.g. "DISK-15").
+   * Defaults to status `todo`. Sub-tasks under an Inbox parent (no project) keep
+   * `seq = null`, exactly like Inbox tasks, until the parent is assigned.
    */
-  async addSubtask(parentId: string, title: string): Promise<TaskDto> {
+  async addSubtask(
+    parentId: string,
+    title: string,
+    status?: TaskStatus,
+  ): Promise<TaskDto> {
     const parent = await readDto(parentId);
     if (parent.parentId) throw badRequest('sub-tasks are one level deep');
-    const [row] = await db
-      .insert(schema.tasks)
-      .values({
-        title,
-        parentId,
-        projectId: parent.projectId,
-        moduleId: parent.moduleId,
-        milestoneId: parent.milestoneId,
-        status: 'todo',
-        seq: null,
-      })
-      .returning({ id: schema.tasks.id });
-    return readDto(row.id);
+    const s: TaskStatus = status ?? 'todo';
+    // addSubtask is the one mutation not guarded by a Zod schema, and the DB enum
+    // is only a type hint — validate the status explicitly so a bad value can't persist.
+    if (!(TASK_STATUS as readonly string[]).includes(s)) {
+      throw badRequest(`invalid status "${s}"`);
+    }
+    const values = {
+      title,
+      parentId,
+      projectId: parent.projectId,
+      moduleId: parent.moduleId,
+      milestoneId: parent.milestoneId,
+      status: s,
+      ...completedAtFor(s),
+    };
+
+    // Inbox parent: no project, no seq (a ref is allocated once assigned).
+    if (!parent.projectId) {
+      const [row] = await db
+        .insert(schema.tasks)
+        .values({ ...values, seq: null })
+        .returning({ id: schema.tasks.id });
+      return readDto(row.id);
+    }
+
+    // Assigned parent: allocate a per-project seq atomically, like create().
+    const projectId = parent.projectId;
+    const id = await db.transaction(async (tx) => {
+      const seq = await allocateSeq(tx, projectId);
+      const [row] = await tx
+        .insert(schema.tasks)
+        .values({ ...values, seq })
+        .returning({ id: schema.tasks.id });
+      return row.id;
+    });
+    return readDto(id);
   },
 
   /** Resolve "DISK-3" → the task DTO. */
