@@ -1,3 +1,10 @@
+# IndieWork — full stack in Docker: Postgres runs as a CONTAINER.
+# The app talks to Postgres over the compose network (host "db", port 5432).
+#
+#   docker compose -f docker/compose.postgres-container.yml up -d
+#
+# Data persists in the named volume `iw_pgdata`. The app runs migrations +
+# seeds a default workspace on boot (both idempotent).
 services:
   db:
     image: postgres:17-alpine
@@ -7,7 +14,8 @@ services:
       POSTGRES_PASSWORD: indiework
       POSTGRES_DB: indiework
     ports:
-      # Host 5433 to avoid clashing with a local Postgres on 5432.
+      # Host 5433 -> container 5432, so a local Postgres on 5432 doesn't clash.
+      # Only needed if you want to reach this DB from the host (e.g. pnpm db:studio).
       - '5433:5432'
     volumes:
       - iw_pgdata:/var/lib/postgresql/data
@@ -26,6 +34,7 @@ services:
       db:
         condition: service_healthy
     environment:
+      # Inside the compose network the DB is reachable at host "db", port 5432.
       DATABASE_URL: postgres://indiework:indiework@db:5432/indiework
       APP_PASSWORD: ${APP_PASSWORD:-change-me}
       COOKIE_SECRET: ${COOKIE_SECRET:-replace-with-a-long-random-string-at-least-32-chars}

@@ -1,0 +1,98 @@
+name: deploy
+
+# CI on every push/PR; build + deploy to the VPS only on push to main.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---- CI: lint, typecheck, unit + integration tests (real Postgres) ----
+  ci:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: indiework
+          POSTGRES_PASSWORD: indiework
+          POSTGRES_DB: indiework
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U indiework -d indiework"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      # Integration test (tests/services.int.test.ts) needs a live DB + the
+      # server env (src/server/env.ts validates all four at import time).
+      DATABASE_URL: postgres://indiework:indiework@localhost:5432/indiework
+      APP_PASSWORD: ci-test
+      COOKIE_SECRET: ci-cookie-secret-at-least-32-characters-long
+      API_TOKEN: ci-token
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      # Apply schema before the integration test. Run the script directly
+      # (the db:migrate script uses --env-file=.env, which doesn't exist in CI).
+      - run: node --import tsx src/server/db/migrate.ts
+      - run: pnpm test
+
+  # ---- Build the production image and push it to GHCR ----
+  build:
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---- Pull the new image on the VPS and restart ----
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          # The GHCR package is public (repo is public), so the VPS pulls it
+          # anonymously — no docker login / GHCR_TOKEN needed.
+          script: |
+            set -e
+            cd ~/indiework
+            docker compose -f compose.prod.yml pull
+            docker compose -f compose.prod.yml up -d
+            docker image prune -f

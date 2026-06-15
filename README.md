@@ -34,11 +34,15 @@ You need Docker. From the repo root:
 
 ```bash
 cp .env.example .env      # then edit: set APP_PASSWORD, COOKIE_SECRET, API_TOKEN
-docker compose -f docker/compose.yml up -d
+docker compose -f docker/compose.postgres-container.yml up -d
 ```
 
 Open <http://localhost:3000>, log in with `APP_PASSWORD`, and you're in. The container
 runs migrations + seeds a default workspace on boot; Postgres data persists in a volume.
+
+> Already run Postgres on the host and only want the app in Docker? Use
+> `docker compose -f docker/compose.postgres-host.yml up -d` instead — it connects to your
+> host Postgres via `host.docker.internal` (see comments at the top of that file).
 
 > Generate a cookie secret: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
 
@@ -49,11 +53,11 @@ First get a Postgres database — pick **one** of the two options below — then
 ### Database — option A: Docker (recommended)
 
 ```bash
-docker compose -f docker/compose.yml up -d db   # Postgres on localhost:5433
+docker compose -f docker/compose.postgres-container.yml up -d db   # Postgres on localhost:5432
 ```
 
 The container creates the role, password, and database (`indiework` / `indiework` /
-`indiework`) for you. Set the `DATABASE_URL` host to `127.0.0.1:5433` in `.env`.
+`indiework`) for you. Set the `DATABASE_URL` host to `127.0.0.1:5432` in `.env`.
 
 ### Database — option B: standalone Postgres (no Docker)
 
