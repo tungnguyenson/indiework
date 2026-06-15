@@ -9,6 +9,7 @@ import {
   DEFAULT_FILTERS,
   DEFAULT_BOARD_CFG,
   type GroupDim,
+  type GroupStyle,
   type Filters,
   type FieldVis,
   type BoardCfg,
@@ -47,6 +48,7 @@ interface Project {
 interface DisplayState {
   groupBy: GroupDim;
   subGroupBy: GroupDim;
+  groupStyle: GroupStyle;
   filters: Filters;
   statusOrder: TaskStatus[];
   statusHidden: TaskStatus[];
@@ -76,6 +78,7 @@ export function ProjectView({
   const [disp, setDisp] = useLocalStorage<DisplayState>(`iw-display-${project.key}`, {
     groupBy: availDims[0] ?? 'status',
     subGroupBy: 'none',
+    groupStyle: 'band',
     filters: DEFAULT_FILTERS,
     statusOrder: [],
     statusHidden: [],
@@ -207,6 +210,8 @@ export function ProjectView({
                 setGroupBy={(d) => setDisp((s) => ({ ...s, groupBy: d }))}
                 subGroupBy={effSecondary}
                 setSubGroupBy={(d) => setDisp((s) => ({ ...s, subGroupBy: d }))}
+                groupStyle={disp.groupStyle ?? 'band'}
+                setGroupStyle={(g) => setDisp((s) => ({ ...s, groupStyle: g }))}
                 availDims={availDims}
                 filters={filters}
                 setFilters={(f) => setDisp((s) => ({ ...s, filters: f }))}
@@ -224,7 +229,7 @@ export function ProjectView({
       {mode === 'board' ? (
         <BoardView project={project} modules={modules} milestones={milestones} tasks={scoped} cfg={boardCfg} />
       ) : (
-        <div className="scroll-body">
+        <div className="scroll-body" data-group-style={disp.groupStyle ?? 'band'}>
           {anyTasks ? (
             visibleSections.map((section) => (
               <Section

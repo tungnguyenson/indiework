@@ -389,9 +389,9 @@
 /* ============================================================
    Overview (editable project meta)
    ============================================================ */
-.overview { max-width: 1080px; margin: 0 auto; padding: 22px 24px 90px; width: 100%; }
+.overview { max-width: 1080px; margin: 0; padding: 22px 24px 90px; width: 100%; }
 .ov-layout { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 36px; align-items: start; }
-.ov-main { min-width: 0; }
+.ov-main { min-width: 0; max-width: 680px; }
 .ov-grid { display: grid; grid-template-columns: 116px 1fr; gap: 11px 18px; align-items: center; }
 .ov-label { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
 .ov-desc-label { display: block; margin: 24px 0 9px; }

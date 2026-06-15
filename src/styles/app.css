@@ -203,6 +203,20 @@
 .section-head { display: flex; align-items: center; gap: 10px; padding: 12px 8px 8px; cursor: pointer;
   border-radius: var(--r-sm); position: sticky; top: 0; background: var(--bg-canvas); z-index: 2; }
 .section-head:hover { background: var(--bg-hover); }
+
+/* ----- Group-header style (Display ▸ Group header) ----- */
+/* A — Band: full-bleed tinted shelf with a hairline base (default) */
+[data-group-style="band"] .section { margin-bottom: 10px; }
+[data-group-style="band"] .section-head { margin: 0 -22px; padding: 9px 22px 9px 30px;
+  background: var(--bg-app); border-radius: 0; box-shadow: inset 0 -1px 0 var(--border-soft); }
+[data-group-style="band"] .section-head:hover { background: var(--bg-sunken); }
+/* B — Rule: no fill, a hairline divider + breathing room above each group */
+[data-group-style="rule"] .section { margin-top: 22px; margin-bottom: 6px; }
+[data-group-style="rule"] .section:first-child { margin-top: 0; }
+[data-group-style="rule"] .section-head { margin: 0 -22px; padding: 15px 22px 8px 30px;
+  border-top: 1px solid var(--border); border-radius: 0; }
+[data-group-style="rule"] .section:first-child .section-head { border-top: 0; padding-top: 8px; }
+
 .section-caret { color: var(--text-faint); display: grid; place-items: center; transition: transform .16s; flex: none; }
 .section-caret[data-collapsed] { transform: rotate(-90deg); }
 .section-dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
@@ -223,7 +237,7 @@
   background: var(--bg-sunken); border: 1px solid var(--border-soft); padding: 3px 8px; border-radius: var(--r-pill); }
 
 /* ---------- Task row ---------- */
-.task-row { display: flex; align-items: center; gap: 12px; padding: var(--row-pad-y) 12px var(--row-pad-y) 34px;
+.task-row { display: flex; align-items: center; gap: 10px; padding: var(--row-pad-y) 12px;
   border-radius: var(--r-sm); cursor: pointer; transition: background .1s; position: relative;
   border-bottom: 1px solid var(--border-soft); }
 .task-row:last-child { border-bottom: none; }
@@ -248,9 +262,13 @@
 .milestone-tag { color: var(--text-muted); }
 .due-pill[data-due="overdue"] { color: var(--st-danger); font-weight: 600; }
 .due-pill[data-due="soon"] { color: var(--pr-high); font-weight: 580; }
-/* hover-reveal: secondary meta hidden until hover */
+/* hover-reveal: only the status chip is hidden until hover; priority, ref,
+   tags and due stay visible (matches design) */
 .task-reveal { display: flex; align-items: center; gap: 8px; opacity: 0; transition: opacity .12s; }
 .task-row:hover .task-reveal, .task-row[data-selected] .task-reveal { opacity: 1; }
+/* fixed-width right slot so the visible meta (tags, due) shares a consistent
+   right edge across rows regardless of status-label width */
+.status-reveal { width: 84px; flex: none; justify-content: flex-end; }
 
 /* sub-task count pill + inline checklist */
 .subtask-count { display: inline-flex; align-items: center; gap: 4px; font: 600 11px/1 var(--font-mono);
@@ -275,17 +293,25 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .subtask-row[data-done] .subtask-title { color: var(--text-faint); text-decoration: line-through; }
 
-/* ---------- row selection ---------- */
-.task-select { position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
-  width: 16px; height: 16px; border-radius: var(--r-xs); border: 1.6px solid var(--border-strong);
+/* ---------- row selection (leading control · in flow) ----------
+   select box, priority and ref sit between the square select and the round
+   status circle so the two checkboxes never read as a pair. */
+.task-select { width: 16px; height: 16px; border-radius: var(--r-xs); border: 1.6px solid var(--border-strong);
   background: var(--bg-surface); display: grid; place-items: center; color: #fff; padding: 0;
   opacity: 0; transition: opacity .12s, background .12s, border-color .12s; flex: none; cursor: pointer; }
-.task-row:hover .task-select, .task-row[data-selmode] .task-select { opacity: 1; }
+.task-row:hover .task-select, .task-row[data-selmode] .task-select, .task-row[data-checked] .task-select { opacity: 1; }
 .task-select:hover { border-color: var(--accent); }
-.task-row[data-checked] .task-select { opacity: 1; background: var(--accent); border-color: var(--accent); }
+.task-row[data-checked] .task-select { background: var(--accent); border-color: var(--accent); }
 .task-row[data-checked] { background: var(--accent-softer); }
 .task-row[data-checked]:hover { background: var(--accent-soft); }
-.row-add { display: flex; align-items: center; gap: 8px; padding: 8px 12px 8px 34px; color: var(--text-faint);
+
+/* leading priority + task-ref columns — kept in flow so the status circle
+   and the titles line up across every row */
+.task-lead-pri { display: flex; align-items: center; justify-content: center; width: 14px; flex: none; }
+.task-ref-lead { width: 60px; flex: none; font: 500 11.5px/1 var(--font-mono); color: var(--text-faint);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.row-add { display: flex; align-items: center; gap: 8px; padding: 8px 12px 8px 132px; color: var(--text-faint);
   font-size: 13px; font-weight: 500; border-radius: var(--r-sm); cursor: text; white-space: nowrap; }
 .row-add:hover { background: var(--bg-hover); color: var(--text-muted); }
 .row-add input { border: none; background: none; outline: none; flex: 1; font-size: 13.5px; color: var(--text-strong); }

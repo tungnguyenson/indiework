@@ -13,7 +13,7 @@ import {
   type TaskStatus,
   type TaskPriority,
 } from '@/lib/domain';
-import type { GroupDim, Filters, FieldVis, BoardCfg, BoardOrdering } from '@/lib/grouping';
+import type { GroupDim, GroupStyle, Filters, FieldVis, BoardCfg, BoardOrdering } from '@/lib/grouping';
 import type { ViewMode } from '@/lib/views';
 
 const DIM_LABEL: Record<GroupDim, string> = {
@@ -55,6 +55,8 @@ export interface DisplayProps {
   setGroupBy: (d: GroupDim) => void;
   subGroupBy: GroupDim;
   setSubGroupBy: (d: GroupDim) => void;
+  groupStyle: GroupStyle;
+  setGroupStyle: (g: GroupStyle) => void;
   availDims: GroupDim[];
   filters: Filters;
   setFilters: (f: Filters) => void;
@@ -65,10 +67,11 @@ export interface DisplayProps {
 }
 
 export function DisplayPopover(props: DisplayProps) {
-  const { groupBy, subGroupBy, availDims, filters, statusHidden } = props;
+  const { groupBy, subGroupBy, groupStyle, availDims, filters, statusHidden } = props;
   const dirty =
     groupBy !== (availDims[0] ?? 'status') ||
     subGroupBy !== 'none' ||
+    groupStyle !== 'band' ||
     filters.hideDone ||
     filters.showSubtasks ||
     statusHidden.length > 0 ||
@@ -93,7 +96,7 @@ export function DisplayPopover(props: DisplayProps) {
 
 function DisplayBody(props: DisplayProps) {
   const [screen, setScreen] = useState<'main' | 'order'>('main');
-  const { mode, setMode, groupBy, setGroupBy, subGroupBy, setSubGroupBy, availDims, filters, setFilters } = props;
+  const { mode, setMode, groupBy, setGroupBy, subGroupBy, setSubGroupBy, groupStyle, setGroupStyle, availDims, filters, setFilters } = props;
 
   if (screen === 'order') {
     return <GroupOrder {...props} onBack={() => setScreen('main')} />;
@@ -139,6 +142,19 @@ function DisplayBody(props: DisplayProps) {
               ))}
             </select>
           </div>
+          {groupBy !== 'none' && (
+            <div className="dp-row">
+              <span className="dp-row-lbl">Group header</span>
+              <div className="seg-wrap">
+                <button className="seg-btn" data-active={groupStyle === 'band' ? '' : undefined} onClick={() => setGroupStyle('band')} type="button">
+                  Band
+                </button>
+                <button className="seg-btn" data-active={groupStyle === 'rule' ? '' : undefined} onClick={() => setGroupStyle('rule')} type="button">
+                  Rule
+                </button>
+              </div>
+            </div>
+          )}
           {groupBy === 'status' && (
             <button className="dp-back" style={{ padding: '2px 4px' }} onClick={() => setScreen('order')} type="button">
               Group ordering <Ic.chevronRight size={14} style={{ marginLeft: 'auto' }} />

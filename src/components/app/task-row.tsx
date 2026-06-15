@@ -67,12 +67,20 @@ export function TaskRow({
           {checked && <Ic.check size={11} strokeWidth={2.6} />}
         </button>
 
+        {/* Leading priority + ref columns — always visible, kept in flow so the
+            status circle and titles line up across every row (matches design). */}
+        {fields.priority && (
+          <span className="task-lead-pri">
+            <PriorityBars priority={task.priority} />
+          </span>
+        )}
+        {fields.taskId && task.ref && <span className="task-ref task-ref-lead">{task.ref}</span>}
+
         <CircleCheck done={task.done} status={task.status} onToggle={() => onToggleDone(task.id)} />
 
         <div className="task-main">
           <div className="task-line">
             <span className="task-title">{task.title}</span>
-            {fields.taskId && task.ref && <span className="task-ref">{task.ref}</span>}
           </div>
           {task.status === 'pending' && task.statusNote && (
             <div className="task-note-2nd">
@@ -82,7 +90,9 @@ export function TaskRow({
           )}
         </div>
 
-        <div className="task-meta task-reveal">
+        {/* Right meta stays visible (subtask · attachments · tags · due);
+            only the status chip is hover-revealed via status-reveal. */}
+        <div className="task-meta">
           {hasChildren && (
             <span
               className="subtask-count"
@@ -97,11 +107,14 @@ export function TaskRow({
               <Ic.paperclip size={12} /> {task.attachmentCount}
             </span>
           )}
-          {fields.status && <StatusChip status={task.status} size="sm" />}
-          {fields.priority && <PriorityBars priority={task.priority} />}
-          {task.dueDate && <DuePill due={task.dueDate} />}
           {fields.module && showModule && module && <ModuleTag name={module.name} color={module.color} icon={module.icon} />}
           {fields.milestone && showMilestone && milestone && <MilestoneTag name={milestone.name} />}
+          {task.dueDate && <DuePill due={task.dueDate} />}
+          {fields.status && (
+            <span className="task-reveal status-reveal">
+              <StatusChip status={task.status} size="sm" />
+            </span>
+          )}
         </div>
       </div>
 

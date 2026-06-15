@@ -17,6 +17,8 @@ import {
 } from '@/lib/domain';
 
 export type GroupDim = 'module' | 'milestone' | 'status' | 'priority' | 'none';
+/** Visual treatment for group/section headers in the list. */
+export type GroupStyle = 'band' | 'rule';
 export type IconName = 'cube' | 'target' | 'flag';
 
 export interface GroupModule {
