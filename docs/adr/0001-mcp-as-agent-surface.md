@@ -26,9 +26,10 @@ The service layer **already implements the full surface this feature needs**:
 | tasks     | `create` · `update` · `delete` · `toggleDone` · `assignToProject` · `setStatusNote` · `reorder` · `list` · `getByRef` |
 
 So the feature is **not "build a capability"** — it is **"register the missing
-adapters."** Today the MCP server ([src/app/mcp/route.ts](../../src/app/mcp/route.ts))
-exposes 8 tools and is missing: project create/update/archive, task delete, and
-all milestone/module management.
+adapters."** Before this change the MCP server
+([src/app/mcp/route.ts](../../src/app/mcp/route.ts)) exposed 9 read/write task tools
+and was missing: project create/update/archive, task delete, and all
+milestone/module management.
 
 Two real questions remained:
 
@@ -62,19 +63,25 @@ Two real questions remained:
 
 ## Tool roster (the contract)
 
-**Existing — keep:** `create_task` · `list_tasks` · `get_task` · `update_task` ·
-`add_comment` · `set_status_note` · `list_projects` · `list_inbox`.
+> **Status: implemented 2026-06-15.** All tools below are registered — 23 total
+> (9 original + 14 added). Per-tool args: [mcp.md](../mcp.md).
 
-**To add:**
+**Existing — keep:** `create_task` · `add_subtask` · `list_tasks` · `get_task` ·
+`update_task` · `add_comment` · `set_status_note` · `list_projects` · `list_inbox`.
 
+**Added:**
+
+- **Read:** `get_project` — returns a project with its milestones **and** modules
+  embedded. Added beyond the original ask because the milestone/module write tools
+  address rows by uuid, and `list_projects` does not surface those ids; `get_project`
+  is how the agent discovers them.
 - **Tasks:** `delete_task`
 - **Projects:** `create_project` · `update_project` · `archive_project`
 - **Milestones:** `create_milestone` · `update_milestone` · `set_milestone_status` · `remove_milestone` · `reorder_milestones`
 - **Modules:** `create_module` · `update_module` · `archive_module` · `reorder_modules`
 
 Each new tool is a **thin wrapper over the matching service method**, mirroring the
-existing tools in [src/app/mcp/route.ts](../../src/app/mcp/route.ts). Final tool
-names/argument shapes are confirmed at implementation time.
+existing tools in [src/app/mcp/route.ts](../../src/app/mcp/route.ts).
 
 ## Authorization reality (today vs. later)
 
@@ -106,7 +113,7 @@ enforcement. When managed keys land, destructive tools can be gated behind
 
 - [scope.md](../scope.md) §1 (three frontends, one service layer), §4 (external access)
 - [roadmap.md](../roadmap.md) — Phase 3 (MCP), Phase 4 (managed `api_keys`)
-- [src/app/mcp/route.ts](../../src/app/mcp/route.ts) — current 9 tools
+- [src/app/mcp/route.ts](../../src/app/mcp/route.ts) — 23 registered tools
 - [mcp.md](../mcp.md) — connecting an MCP client (config snippets + tool reference)
 - `src/server/services/*` — capabilities already implemented
 - [src/server/auth/token.ts](../../src/server/auth/token.ts) — token auth; scope not yet enforced

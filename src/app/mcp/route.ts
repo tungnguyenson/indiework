@@ -49,6 +49,12 @@ const idFromRef = async (ref: unknown): Promise<string> => {
   if (typeof ref !== 'string') throw new ServiceError('bad_request', 'ref is required');
   return (await taskService.getByRef(ref)).id;
 };
+/** Resolve a required project KEY → uuid (throws if absent or unknown). */
+const requireProjectId = async (key: unknown): Promise<string> => {
+  if (typeof key !== 'string' || !key)
+    throw new ServiceError('bad_request', 'project (a project KEY) is required');
+  return (await projectService.getByKey(key)).id;
+};
 
 const TOOLS: Tool[] = [
   {
@@ -151,6 +157,205 @@ const TOOLS: Tool[] = [
     description: 'List untriaged Inbox tasks.',
     inputSchema: { type: 'object', properties: {} },
     run: async () => taskService.listInbox(),
+  },
+
+  // ---- Projects ----
+  {
+    name: 'get_project',
+    description:
+      'Get one project by KEY (e.g. "SITE") with its milestones and modules embedded. Use this to discover milestone/module ids before update/remove/reorder.',
+    inputSchema: { type: 'object', properties: { project: str() }, required: ['project'] },
+    run: async (a) => {
+      const project = await projectService.getByKey(a.project as string);
+      const [milestones, modules] = await Promise.all([
+        milestoneService.list(project.id),
+        moduleService.list(project.id),
+      ]);
+      return { ...project, milestones, modules };
+    },
+  },
+  {
+    name: 'create_project',
+    description:
+      'Create a project. `key` is the unique uppercase ref prefix (2–10 chars, A–Z then A–Z/0–9, e.g. "SITE").',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        key: str(),
+        name: str(),
+        emoji: str(),
+        color: str(),
+        status: { type: 'string', enum: [...PROJECT_STATUS] },
+        pinned: { type: 'boolean' },
+        tags: { type: 'array', items: str() },
+        short_desc: str(),
+        status_note: str(),
+        description: { ...str(), description: 'Markdown' },
+      },
+      required: ['key', 'name'],
+    },
+    run: async (a) =>
+      projectService.create({
+        key: a.key,
+        name: a.name,
+        emoji: a.emoji,
+        color: a.color,
+        status: a.status,
+        pinned: a.pinned,
+        tags: a.tags,
+        shortDesc: a.short_desc,
+        statusNote: a.status_note,
+        description: a.description,
+      }),
+  },
+  {
+    name: 'update_project',
+    description:
+      'Patch a project by KEY. `patch` may set name, status, pinned, tags, emoji, color, shortDesc, statusNote, description (markdown). Keys are camelCase.',
+    inputSchema: {
+      type: 'object',
+      properties: { project: str(), patch: { type: 'object' } },
+      required: ['project', 'patch'],
+    },
+    run: async (a) => projectService.update(await requireProjectId(a.project), (a.patch as Json) ?? {}),
+  },
+  {
+    name: 'archive_project',
+    description:
+      'Archive (soft-delete) a project by KEY. Reversible — sets archived_at and the data is retained. There is no hard delete.',
+    inputSchema: { type: 'object', properties: { project: str() }, required: ['project'] },
+    run: async (a) => projectService.archive(await requireProjectId(a.project)),
+  },
+
+  // ---- Tasks (destructive) ----
+  {
+    name: 'delete_task',
+    description: 'Permanently delete a task by ref, e.g. "SITE-3". Hard delete — cannot be undone.',
+    inputSchema: { type: 'object', properties: { ref: str() }, required: ['ref'] },
+    run: async (a) => taskService.delete(await idFromRef(a.ref)),
+  },
+
+  // ---- Milestones ----
+  {
+    name: 'create_milestone',
+    description: 'Create a milestone in a project. `project` is a project KEY.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project: str(),
+        name: str(),
+        description: str(),
+        status: { type: 'string', enum: [...MILESTONE_STATUS] },
+        target_date: { ...str(), description: 'ISO date, e.g. 2026-07-15' },
+        position: { type: 'integer' },
+      },
+      required: ['project', 'name'],
+    },
+    run: async (a) =>
+      milestoneService.create({
+        projectId: await requireProjectId(a.project),
+        name: a.name,
+        description: a.description,
+        status: a.status,
+        targetDate: a.target_date,
+        position: a.position,
+      }),
+  },
+  {
+    name: 'update_milestone',
+    description:
+      'Patch a milestone by id (get the id from get_project). `patch` may set name, description, status, targetDate (ISO date), position. Keys are camelCase.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: str(), patch: { type: 'object' } },
+      required: ['id', 'patch'],
+    },
+    run: async (a) => milestoneService.update(a.id as string, (a.patch as Json) ?? {}),
+  },
+  {
+    name: 'set_milestone_status',
+    description: 'Set a milestone status by id. One of planned · active · done.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: str(), status: { type: 'string', enum: [...MILESTONE_STATUS] } },
+      required: ['id', 'status'],
+    },
+    run: async (a) => milestoneService.setStatus(a.id as string, a.status as never),
+  },
+  {
+    name: 'remove_milestone',
+    description:
+      "Permanently delete a milestone by id. Tasks keep working — their milestone link is cleared.",
+    inputSchema: { type: 'object', properties: { id: str() }, required: ['id'] },
+    run: async (a) => milestoneService.remove(a.id as string),
+  },
+  {
+    name: 'reorder_milestones',
+    description:
+      "Set the display order of a project's milestones. `ids` is the full ordered list of milestone ids.",
+    inputSchema: {
+      type: 'object',
+      properties: { ids: { type: 'array', items: str() } },
+      required: ['ids'],
+    },
+    run: async (a) => milestoneService.reorder({ ids: a.ids }),
+  },
+
+  // ---- Modules ----
+  {
+    name: 'create_module',
+    description: 'Create a module (sub-system) in a project. `project` is a project KEY.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project: str(),
+        name: str(),
+        color: str(),
+        icon: { type: 'string', enum: [...MODULE_ICONS] },
+        state: { type: 'string', enum: [...MODULE_STATE] },
+        description: str(),
+        position: { type: 'integer' },
+      },
+      required: ['project', 'name'],
+    },
+    run: async (a) =>
+      moduleService.create({
+        projectId: await requireProjectId(a.project),
+        name: a.name,
+        color: a.color,
+        icon: a.icon,
+        state: a.state,
+        description: a.description,
+        position: a.position,
+      }),
+  },
+  {
+    name: 'update_module',
+    description:
+      'Patch a module by id (get the id from get_project). `patch` may set name, color, icon, state, description, position. Keys are camelCase.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: str(), patch: { type: 'object' } },
+      required: ['id', 'patch'],
+    },
+    run: async (a) => moduleService.update(a.id as string, (a.patch as Json) ?? {}),
+  },
+  {
+    name: 'archive_module',
+    description: 'Archive (soft-delete) a module by id. Reversible — sets archived_at.',
+    inputSchema: { type: 'object', properties: { id: str() }, required: ['id'] },
+    run: async (a) => moduleService.archive(a.id as string),
+  },
+  {
+    name: 'reorder_modules',
+    description:
+      "Set the display order of a project's modules. `ids` is the full ordered list of module ids.",
+    inputSchema: {
+      type: 'object',
+      properties: { ids: { type: 'array', items: str() } },
+      required: ['ids'],
+    },
+    run: async (a) => moduleService.reorder({ ids: a.ids }),
   },
 ];
 

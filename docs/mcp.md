@@ -68,7 +68,9 @@ curl -s -X POST http://localhost:3000/mcp \
 
 ## Tools
 
-Nine tools, each a thin wrapper over a service method.
+23 tools, each a thin wrapper over a service method. Grouped by what they touch.
+
+### Tasks
 
 | Tool | Required args | Optional args | Notes |
 |---|---|---|---|
@@ -79,18 +81,49 @@ Nine tools, each a thin wrapper over a service method.
 | `update_task` | `ref`, `patch` | — | `patch` may set `title`, `status`, `priority`, `moduleId`, `milestoneId`, `dueDate`, `statusNote`, `description`. |
 | `add_comment` | `ref`, `body` | — | Appended to the timeline with source `agent`. |
 | `set_status_note` | `ref`, `note` | — | Overwrites the pinned status note (what's blocking / where it is). |
-| `list_projects` | — | — | All projects. |
+| `delete_task` | `ref` | — | **Hard delete — cannot be undone.** |
 | `list_inbox` | — | — | Untriaged Inbox tasks. |
+
+### Projects
+
+| Tool | Required args | Optional args | Notes |
+|---|---|---|---|
+| `list_projects` | — | — | All projects (with open-issue counts). |
+| `get_project` | `project` | — | Project **with its milestones + modules embedded** — use it to discover milestone/module ids. |
+| `create_project` | `key`, `name` | `emoji`, `color`, `status`, `pinned`, `tags`, `short_desc`, `status_note`, `description` | `key` = uppercase ref prefix (2–10 chars). |
+| `update_project` | `project`, `patch` | — | `patch` may set `name`, `status`, `pinned`, `tags`, `emoji`, `color`, `shortDesc`, `statusNote`, `description`. |
+| `archive_project` | `project` | — | **Soft-delete (reversible).** There is no hard project delete. |
+
+### Milestones
+
+| Tool | Required args | Optional args | Notes |
+|---|---|---|---|
+| `create_milestone` | `project`, `name` | `description`, `status`, `target_date`, `position` | `status` ∈ `planned · active · done`. |
+| `update_milestone` | `id`, `patch` | — | `patch` may set `name`, `description`, `status`, `targetDate`, `position`. |
+| `set_milestone_status` | `id`, `status` | — | `planned · active · done`. |
+| `remove_milestone` | `id` | — | Hard delete; tasks keep working (milestone link cleared). |
+| `reorder_milestones` | `ids` | — | Full ordered list of milestone ids. |
+
+### Modules
+
+| Tool | Required args | Optional args | Notes |
+|---|---|---|---|
+| `create_module` | `project`, `name` | `color`, `icon`, `state`, `description`, `position` | `state` ∈ `planned · active · done · archived`. |
+| `update_module` | `id`, `patch` | — | `patch` may set `name`, `color`, `icon`, `state`, `description`, `position`. |
+| `archive_module` | `id` | — | Soft-delete (reversible). |
+| `reorder_modules` | `ids` | — | Full ordered list of module ids. |
 
 ### Argument conventions
 
 - **`project`** is a project **KEY** (e.g. `SITE`), not an internal id.
 - **`ref` / `parent_ref`** is the human ref (e.g. `SITE-3`), shown on every task row.
-- **`module` / `milestone`** (in `create_task` / `list_tasks`) take the module/milestone
-  **id** — get them from `list_projects` or the relevant task.
+- **`id`** (on the milestone/module tools, and `module` / `milestone` on `create_task` /
+  `list_tasks`) is the internal uuid — get it from **`get_project`**.
+- **`patch`** objects use **camelCase** keys (e.g. `statusNote`, `dueDate`, `targetDate`),
+  per each tool's row above.
 - **`status`** is one of `inbox · backlog · todo · in_progress · in_review · pending ·
   done · cancelled`; **`priority`** is `none · low · medium · high · urgent`.
-- **`due_date`** is an ISO date, e.g. `2026-07-15`.
+- **`due_date` / `target_date`** are ISO dates, e.g. `2026-07-15`.
 
 ## Caveats
 
