@@ -41,7 +41,7 @@ describe('buildRef / parseRef', () => {
     expect(parseRef('-14')).toBeNull();
     expect(parseRef('disk-14')).toBeNull();
     expect(parseRef('DISK-0')).toBeNull();
-    expect(parseRef('DISK-1.5')).toBeNull(); // sub-task dot-refs are never parsed back
+    expect(parseRef('DISK-1.5')).toBeNull(); // seq must be a whole number
   });
 });
 

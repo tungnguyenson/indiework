@@ -159,14 +159,16 @@ Drop the standalone `/board` route (redirect → `?view=…`).
 
 ## Phase 6 — Sub-tasks (v2 parity)
 
-**Refs are the sharp edge.** `parseRef`/`getByRef` assume `KEY-<digits>` and the DB has
-`tasks_project_seq_unique(projectId, seq)`. Sub-tasks get **`seq = NULL`** (multiple NULLs are allowed by the
-unique index) and a **derived dot-ref** `${parentRef}.${indexUnderParent}` computed in the DTO — never parsed back
-through `parseRef`. Decide: extend `parseRef` to resolve dot-refs, or explicitly reject them (recommend reject;
-sub-tasks open by id).
+**Refs.** `parseRef`/`getByRef` assume `KEY-<digits>` and the DB has `tasks_project_seq_unique(projectId, seq)`.
+**Decision (revised):** sub-tasks are **first-class tasks** — they allocate their own per-project `seq`, so they get a
+normal `KEY-<n>` ref (e.g. `DISK-15`) and are addressable by every ref-based tool (`update_task`, `get_task`,
+`add_comment`, …) with no special parsing. The earlier dot-ref scheme (`seq = NULL` + derived `${parentRef}.N`) is
+dropped; it left sub-tasks unaddressable over MCP. Sub-tasks under an **Inbox** parent keep `seq = NULL` (like any
+Inbox task) until the parent is assigned.
 
-- **Service** (`task.service.ts`): `addSubtask(parentId, title)` — inherits parent `projectId/moduleId/milestoneId`,
-  `status:'todo'`, `seq:null`. Enforce **one level** (reject if parent already has `parentId`). Delete cascades via FK;
+- **Service** (`task.service.ts`): `addSubtask(parentId, title, status?)` — inherits parent
+  `projectId/moduleId/milestoneId`, defaults `status:'todo'`, allocates `seq` via `allocateSeq` when the parent is in a
+  project (else `seq:null`). Enforce **one level** (reject if parent already has `parentId`). Delete cascades via FK;
   ensure bulk-delete also covers children.
 - **Derived** (`load.ts` or client): `rootTasks` (`parentId == null`) and `childrenMap` (`parentId → child[]`).
   List/board/search/grouping operate on **root tasks only**.

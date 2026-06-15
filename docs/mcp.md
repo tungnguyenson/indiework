@@ -82,9 +82,9 @@ curl -s -X POST http://localhost:3000/mcp \
 |---|---|---|---|
 | `create_task` | `title` | `project`, `module`, `milestone`, `status`, `priority`, `due_date` | Omit `project` → lands in the Inbox. |
 | `create_tasks` | `tasks` | `project` | **Bulk create** in one call. `tasks` is an array of `create_task`-shaped items; `project` is the shared default KEY (omit → all Inbox). Returns one `{ ok, ref, id }` / `{ ok: false, error }` per item — one bad item doesn't abort the rest. |
-| `add_subtask` | `parent_ref`, `title` | — | One level deep; inherits the parent's project/module/milestone. |
+| `add_subtask` | `parent_ref`, `title` | `status` | One level deep; inherits the parent's project/module/milestone. Gets its own ref (`KEY-<n>`), so it's patchable like any task. `status` defaults to `todo`. |
 | `list_tasks` | — | `project`, `status`, `milestone`, `module` | Root tasks only; `status` is a single value. |
-| `get_task` | `ref` | — | e.g. `SITE-3`. |
+| `get_task` | `ref` | — | e.g. `SITE-3`. Returns the task plus its `children` (sub-tasks, each with its own ref + status) — use this to enumerate sub-tasks. |
 | `update_task` | `ref`, `patch` | — | `patch` may set `title`, `status`, `priority`, `moduleId`, `milestoneId`, `dueDate`, `statusNote`, `description`. |
 | `update_tasks` | `updates` | — | **Bulk patch** in one call. `updates` is an array of `{ ref, patch }` (same `patch` keys as `update_task`). Returns one `{ ok, ref }` / `{ ok: false, ref, error }` per item. |
 | `add_comment` | `ref`, `body` | — | Appended to the timeline with source `agent`. |

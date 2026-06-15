@@ -119,14 +119,15 @@ describe('service slice (real Postgres)', () => {
     expect(pending.done).toBe(false);
   });
 
-  test('addSubtask inherits parent fields, has no seq, and is one level deep', async () => {
+  test('addSubtask inherits parent fields, allocates its own seq/ref, and is one level deep', async () => {
     const mod = await moduleService.create({ projectId, name: 'Engine', icon: 'cube', state: 'active' });
     const parent = await taskService.create({ projectId, title: 'Parent', moduleId: mod.id });
     const child = await taskService.addSubtask(parent.id, 'Child A');
     expect(child.parentId).toBe(parent.id);
     expect(child.projectId).toBe(projectId);
     expect(child.moduleId).toBe(mod.id); // inherited
-    expect(child.seq).toBeNull(); // no own counter → ref derived as PARENT.N elsewhere
+    expect(child.seq).toEqual(expect.any(Number)); // first-class task → own per-project seq
+    expect(child.ref).toBe(`${KEY}-${child.seq}`);
     expect(child.status).toBe('todo');
 
     const kids = await taskService.listChildren(parent.id);
@@ -136,11 +137,29 @@ describe('service slice (real Postgres)', () => {
     await expect(taskService.addSubtask(child.id, 'Grandchild')).rejects.toBeInstanceOf(ServiceError);
   });
 
+  test('addSubtask honors an explicit status and stamps completedAt when done', async () => {
+    const parent = await taskService.create({ projectId, title: 'Parent with done child' });
+    const child = await taskService.addSubtask(parent.id, 'Done child', 'done');
+    expect(child.status).toBe('done');
+    expect(child.done).toBe(true);
+    expect(child.completedAt).not.toBeNull();
+    expect(child.ref).toBe(`${KEY}-${child.seq}`);
+  });
+
+  test('addSubtask rejects an invalid status', async () => {
+    const parent = await taskService.create({ projectId, title: 'Parent guard' });
+    await expect(
+      // @ts-expect-error — exercising the runtime guard with a bad status
+      taskService.addSubtask(parent.id, 'Bad child', 'nope'),
+    ).rejects.toBeInstanceOf(ServiceError);
+  });
+
   test('create() with parentId delegates to addSubtask', async () => {
     const parent = await taskService.create({ projectId, title: 'Has children' });
     const child = await taskService.create({ projectId, parentId: parent.id, title: 'Via create' });
     expect(child.parentId).toBe(parent.id);
-    expect(child.seq).toBeNull();
+    expect(child.seq).toEqual(expect.any(Number));
+    expect(child.ref).toBe(`${KEY}-${child.seq}`);
   });
 
   test('module carries icon / state / description', async () => {

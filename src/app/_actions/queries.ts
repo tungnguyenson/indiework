@@ -21,15 +21,10 @@ export async function getTaskDetail(id: string) {
     attachmentService.list(id),
   ]);
 
-  // dot-ref for this task when it's a sub-task ("PARENT.N" by sibling order)
-  let displayRef = task.ref;
-  if (parent) {
-    const sibs = await taskService.listChildren(parent.id);
-    const idx = sibs.findIndex((s) => s.id === id);
-    displayRef = parent.ref && idx >= 0 ? `${parent.ref}.${idx + 1}` : null;
-  }
-  // dot-refs for this task's own children
-  const children = rawChildren.map((c, i) => ({ ...c, displayRef: task.ref ? `${task.ref}.${i + 1}` : null }));
+  // Sub-tasks are first-class tasks: each carries its own ref (KEY-<n>), so the
+  // display ref is simply the task's own ref (null only while in the Inbox).
+  const displayRef = task.ref;
+  const children = rawChildren.map((c) => ({ ...c, displayRef: c.ref }));
 
   return { task, displayRef, parent, children, comments, modules, milestones, attachments };
 }

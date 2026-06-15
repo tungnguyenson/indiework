@@ -174,14 +174,18 @@ const TOOLS: Tool[] = [
   },
   {
     name: 'add_subtask',
-    description: 'Add a sub-task (one level) under a parent task. `parent_ref` is the parent ref, e.g. "SITE-3". Inherits the parent project/module/milestone.',
+    description: 'Add a sub-task (one level) under a parent task. `parent_ref` is the parent ref, e.g. "SITE-3". Inherits the parent project/module/milestone and gets its own ref (e.g. "SITE-15"). Optional `status` (defaults to "todo").',
     inputSchema: {
       type: 'object',
-      properties: { parent_ref: str(), title: str() },
+      properties: {
+        parent_ref: str(),
+        title: str(),
+        status: { type: 'string', enum: [...TASK_STATUS], description: 'inbox·backlog·todo·in_progress·in_review·pending·done·cancelled' },
+      },
       required: ['parent_ref', 'title'],
     },
     run: async (a) =>
-      slimTask(await taskService.addSubtask(await idFromRef(a.parent_ref), a.title as string)),
+      slimTask(await taskService.addSubtask(await idFromRef(a.parent_ref), a.title as string, a.status as never)),
   },
   {
     name: 'list_tasks',
@@ -191,18 +195,24 @@ const TOOLS: Tool[] = [
       properties: { project: str(), status: { type: 'string', enum: [...TASK_STATUS] }, milestone: str(), module: str() },
     },
     run: async (a) =>
-      taskService.list({
-        projectId: await projectIdFromKey(a.project),
-        status: a.status ? [a.status as never] : undefined,
-        milestoneId: (a.milestone as string) ?? undefined,
-        moduleId: (a.module as string) ?? undefined,
-      }),
+      (
+        await taskService.list({
+          projectId: await projectIdFromKey(a.project),
+          status: a.status ? [a.status as never] : undefined,
+          milestoneId: (a.milestone as string) ?? undefined,
+          moduleId: (a.module as string) ?? undefined,
+        })
+      ).filter((t) => !t.parentId), // root tasks only; sub-tasks are reached via get_task
   },
   {
     name: 'get_task',
-    description: 'Get one task by its ref, e.g. "SITE-3".',
+    description: 'Get one task by its ref, e.g. "SITE-3". Returns the task plus its `children` (sub-tasks, each with its own ref + status).',
     inputSchema: { type: 'object', properties: { ref: str() }, required: ['ref'] },
-    run: async (a) => taskService.getByRef(a.ref as string),
+    run: async (a) => {
+      const task = await taskService.getByRef(a.ref as string);
+      const children = await taskService.listChildren(task.id);
+      return { ...task, children: children.map(slimTask) };
+    },
   },
   {
     name: 'update_task',
