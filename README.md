@@ -92,6 +92,14 @@ pnpm dev                                         # http://localhost:3000
 
 Scripts: `pnpm typecheck`, `pnpm test` (Vitest), `pnpm db:generate` (new migration from schema), `pnpm db:studio`.
 
+## Deploy
+
+Three ways to ship it, documented under [`docs/infra/`](docs/infra/):
+
+- **[Vercel + Supabase](docs/infra/deploy-vercel-supabase.md)** — no server to manage; Vercel builds/serves, Supabase is managed Postgres.
+- **[VPS + Docker](docs/infra/deploy-vps.md)** — self-host on your own box (Postgres in a container or on the host).
+- **[CI/CD → VPS](docs/infra/ci-cd.md)** — GitHub Actions builds the image, pushes to GHCR, the VPS just pulls.
+
 ## Environment
 
 | Var | Purpose |

@@ -11,6 +11,9 @@ theo 2 hướng tương ứng 2 file compose trong [`docker/`](../../docker/):
 Image app (xem [`docker/Dockerfile`](../../docker/Dockerfile)) **tự chạy migration + seed**
 một workspace mặc định khi boot (cả hai đều idempotent), nên không cần thao tác DB bằng tay.
 
+> Không muốn quản VPS? [deploy-vercel-supabase.md](./deploy-vercel-supabase.md) deploy lên
+> Vercel + Supabase, không cần server.
+
 ---
 
 ## Chọn hướng nào?
