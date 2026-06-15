@@ -3,13 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Modal } from '@/components/ui/modal';
-import { EmojiPicker } from '@/components/ui/emoji-picker';
 import { createWorkspace } from '@/app/_actions/workspace';
 
 export function WorkspaceForm({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const [name, setName] = useState('');
-  const [emoji, setEmoji] = useState('◈');
   const [tagline, setTagline] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -17,7 +15,7 @@ export function WorkspaceForm({ onClose }: { onClose: () => void }) {
     if (!name.trim() || busy) return;
     setBusy(true);
     try {
-      await createWorkspace({ name: name.trim(), emoji, tagline: tagline.trim() || null });
+      await createWorkspace({ name: name.trim(), tagline: tagline.trim() || null });
       // New workspace is now active and empty — land on the app home, not a
       // project page that belongs to the previous workspace.
       router.push('/app');
@@ -43,15 +41,9 @@ export function WorkspaceForm({ onClose }: { onClose: () => void }) {
         </>
       }
     >
-      <div className="field-row">
-        <div className="field" style={{ flex: 'none' }}>
-          <label>Icon</label>
-          <EmojiPicker value={emoji} onPick={setEmoji} triggerClass="emoji-solo" />
-        </div>
-        <div className="field">
-          <label>Name</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Side projects" autoFocus />
-        </div>
+      <div className="field">
+        <label>Name</label>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Side projects" autoFocus />
       </div>
       <div className="field">
         <label>Tagline</label>
