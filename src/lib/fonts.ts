@@ -23,15 +23,21 @@ export interface UiFontOption {
   note: string;
 }
 
-export const UI_FONT_DEFAULT = 'Be Vietnam Pro';
+export const UI_FONT_DEFAULT = 'Hanken Grotesk';
 export const UI_FONT_STORAGE_KEY = 'iw-ui-font';
 
 export const UI_FONTS: readonly UiFontOption[] = [
   {
+    id: 'Hanken Grotesk',
+    label: 'Hanken Grotesk',
+    stack: 'var(--font-hanken), ui-sans-serif, system-ui, sans-serif',
+    tag: 'Default',
+    note: 'Neutral grotesque · crisp, modern',
+  },
+  {
     id: 'Be Vietnam Pro',
     label: 'Be Vietnam Pro',
     stack: 'var(--font-be-vietnam-pro), ui-sans-serif, system-ui, sans-serif',
-    tag: 'Default',
     note: 'Made for Vietnamese · friendly, calm',
   },
   {
@@ -39,12 +45,6 @@ export const UI_FONTS: readonly UiFontOption[] = [
     label: 'Plus Jakarta Sans',
     stack: 'var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif',
     note: 'Geometric · modern',
-  },
-  {
-    id: 'Hanken Grotesk',
-    label: 'Hanken Grotesk',
-    stack: 'var(--font-hanken), ui-sans-serif, system-ui, sans-serif',
-    note: 'Neutral grotesque',
   },
   {
     id: 'System',
