@@ -344,7 +344,7 @@ pm-tool/
 │   ├── components/ui/                # MVP UI
 │   └── lib/
 ├── drizzle/
-├── docker/ (Dockerfile, compose.yml)
+├── docker/ (Dockerfile, compose.postgres-container.yml, compose.postgres-host.yml)
 └── package.json
 ```
 

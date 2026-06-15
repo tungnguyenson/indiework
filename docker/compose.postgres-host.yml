@@ -1,0 +1,30 @@
+# IndieWork — only the APP runs in Docker; Postgres runs on the HOST machine
+# (Homebrew, Postgres.app, apt, an existing server, …).
+#
+#   docker compose -f docker/compose.postgres-host.yml up -d
+#
+# Before first run, create the role + database on your host Postgres once:
+#   psql postgres -c "CREATE ROLE indiework WITH LOGIN PASSWORD 'indiework';"
+#   psql postgres -c "CREATE DATABASE indiework OWNER indiework;"
+#
+# A container cannot reach the host via 127.0.0.1 (that's the container's own
+# loopback). It uses the special DNS name `host.docker.internal` instead. The
+# `extra_hosts` line below makes that name resolve on Linux too (it already
+# works out of the box on Docker Desktop for macOS/Windows).
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    environment:
+      # Point at the host's Postgres. Override DB_HOST_PORT if it isn't 5432.
+      DATABASE_URL: postgres://indiework:indiework@host.docker.internal:${DB_HOST_PORT:-5432}/indiework
+      APP_PASSWORD: ${APP_PASSWORD:-change-me}
+      COOKIE_SECRET: ${COOKIE_SECRET:-replace-with-a-long-random-string-at-least-32-chars}
+      API_TOKEN: ${API_TOKEN:-change-me-too}
+      NODE_ENV: production
+    ports:
+      - '3000:3000'

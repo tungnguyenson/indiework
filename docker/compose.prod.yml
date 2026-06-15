@@ -1,0 +1,32 @@
+# IndieWork — production (VPS). App-only: Postgres runs on the HOST machine or a
+# managed service (Neon/RDS/…). CI builds + pushes the image to GHCR; this file
+# only PULLS it — it never builds.
+#
+# Lives on the VPS at ~/indiework/compose.prod.yml. Deploy:
+#   docker compose -f compose.prod.yml pull
+#   docker compose -f compose.prod.yml up -d
+#
+# Secrets live in a `.env` file next to this one (NOT in git). See
+# docs/infra/deploy-vps.md. Required keys:
+#   DATABASE_URL   postgres://indiework:...@host.docker.internal:5432/indiework
+#   APP_PASSWORD   the web login password
+#   COOKIE_SECRET  >= 32 chars, signs the session cookie
+#   API_TOKEN      Bearer token for REST + MCP
+services:
+  app:
+    # Override IMAGE to pin a specific build for rollback, e.g.
+    #   IMAGE=ghcr.io/tungnguyenson/indiework:<git-sha> docker compose -f compose.prod.yml up -d
+    image: ${IMAGE:-ghcr.io/tungnguyenson/indiework:latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+    # If DATABASE_URL points at Postgres on the VPS host, the container reaches
+    # it via `host.docker.internal` (this line maps that name on Linux). For a
+    # managed DB this is harmless — the hostname in DATABASE_URL is used instead.
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    # Bind to loopback only: your existing reverse proxy (nginx/Caddy/Traefik)
+    # terminates TLS and forwards to 127.0.0.1:3000.
+    ports:
+      - '127.0.0.1:3000:3000'
