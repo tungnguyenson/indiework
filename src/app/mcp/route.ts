@@ -9,11 +9,20 @@
 import {
   taskService,
   projectService,
+  milestoneService,
+  moduleService,
   commentService,
 } from '@/server/services';
 import { requireBearer, MCP_COMMENT_SOURCE } from '@/server/auth/token';
 import { ServiceError } from '@/server/services';
-import { TASK_STATUS, TASK_PRIORITY } from '@/lib/domain';
+import {
+  TASK_STATUS,
+  TASK_PRIORITY,
+  PROJECT_STATUS,
+  MILESTONE_STATUS,
+  MODULE_STATE,
+  MODULE_ICONS,
+} from '@/lib/domain';
 import { ZodError } from 'zod';
 
 export const dynamic = 'force-dynamic';

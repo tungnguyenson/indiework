@@ -44,10 +44,42 @@ runs migrations + seeds a default workspace on boot; Postgres data persists in a
 
 ## Local development
 
+First get a Postgres database — pick **one** of the two options below — then run the app.
+
+### Database — option A: Docker (recommended)
+
+```bash
+docker compose -f docker/compose.yml up -d db   # Postgres on localhost:5433
+```
+
+The container creates the role, password, and database (`indiework` / `indiework` /
+`indiework`) for you. Set the `DATABASE_URL` host to `127.0.0.1:5433` in `.env`.
+
+### Database — option B: standalone Postgres (no Docker)
+
+If you already run Postgres locally (Homebrew, Postgres.app, apt, …) on the default port
+`5432`, create the role and database once. Connect as a superuser, then:
+
+```bash
+# macOS (Homebrew / Postgres.app) — your macOS user is usually a superuser:
+psql postgres -c "CREATE ROLE indiework WITH LOGIN PASSWORD 'indiework';"
+psql postgres -c "CREATE DATABASE indiework OWNER indiework;"
+
+# Linux — connect through the postgres system account instead:
+sudo -u postgres psql -c "CREATE ROLE indiework WITH LOGIN PASSWORD 'indiework';"
+sudo -u postgres psql -c "CREATE DATABASE indiework OWNER indiework;"
+```
+
+`indiework` owns the database, so migrations can create tables in the `public` schema with
+no extra `GRANT` (Postgres 15+). Keep the `DATABASE_URL` host at `127.0.0.1:5432` (the
+`.env.example` default) — use `127.0.0.1`, not `localhost`, to dodge an IPv6 stall on
+macOS. You may pick any role/password/db names; just match them in `DATABASE_URL`.
+
+### Then run the app
+
 ```bash
 pnpm install
-docker compose -f docker/compose.yml up -d db   # Postgres on localhost:5433
-cp .env.example .env                             # set DATABASE_URL host to 127.0.0.1:5433
+cp .env.example .env                             # set APP_PASSWORD, COOKIE_SECRET, API_TOKEN (+ DATABASE_URL host)
 pnpm db:migrate                                  # apply migrations
 pnpm db:seed                                     # default workspace
 pnpm db:seed:sample                              # optional demo project + tasks
