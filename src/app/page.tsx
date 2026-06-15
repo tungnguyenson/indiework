@@ -3,7 +3,7 @@ import '@/styles/landing.css';
 import { BrandMark, Wordmark } from '@/components/ui/brand';
 import { Ic } from '@/components/ui/icons';
 
-const GITHUB_URL = 'https://github.com/indiework/indiework';
+const GITHUB_URL = 'https://github.com/tungnguyenson/indiework';
 
 export default function LandingPage() {
   return (
