@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { getTaskDetail, type TaskDetail } from '@/app/_actions/queries';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { getTaskDetail, getTaskDetailByRef, type TaskDetail } from '@/app/_actions/queries';
 import {
   updateTask,
   setTaskStatusNote,
@@ -25,45 +25,61 @@ import {
 } from '@/lib/domain';
 import { fmtDate, fmtDay, toDateInputValue } from '@/lib/dates';
 import { mdToHtml } from '@/lib/markdown';
+import { commitOnEnter } from '@/lib/inline-edit';
 import type { UpdateTaskInput } from '@/server/validators/task';
+import { useTaskNav } from '@/lib/task-nav';
 import { Popover, OptionList } from '@/components/ui/popover';
 import { RefTag } from '@/components/ui/interactive';
 import { PriorityBars, ModuleIcon, Progress } from '@/components/ui/bits';
 import { CircleCheck } from '@/components/ui/interactive';
 import { Ic } from '@/components/ui/icons';
 
-export function DetailPanel({ taskId, onClose }: { taskId: string; onClose: () => void }) {
+export function DetailPanel({
+  taskRef,
+  taskId,
+  onClose,
+}: {
+  taskRef: string | null;
+  taskId: string | null;
+  onClose: () => void;
+}) {
   const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
+  const { openTask } = useTaskNav();
   const [detail, setDetail] = useState<TaskDetail | null>(null);
+  const [missing, setMissing] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
 
-  const openOther = useCallback(
-    (id: string) => {
-      const sp = new URLSearchParams(Array.from(params.entries()));
-      sp.set('task', id);
-      router.push(`${pathname}?${sp.toString()}`, { scroll: false });
-    },
-    [params, pathname, router],
+  // Project tasks resolve by ref (path URL); Inbox tasks by uuid (?task=).
+  const fetchDetail = useCallback(
+    () => (taskRef ? getTaskDetailByRef(taskRef) : getTaskDetail(taskId as string)),
+    [taskRef, taskId],
   );
 
-  const reload = useCallback(async () => {
-    const fresh = await getTaskDetail(taskId);
-    setDetail(fresh);
-    router.refresh();
-  }, [taskId, router]);
-
+  // Re-fetch on task switch. We intentionally don't reset detail to null here:
+  // the panel keeps showing the previous task until the new one loads, so
+  // switching issues neither flashes the skeleton nor replays the slide-in.
   useEffect(() => {
     let alive = true;
-    setDetail(null);
-    getTaskDetail(taskId).then((d) => {
-      if (alive) setDetail(d);
-    });
+    setMissing(false);
+    setConfirmDel(false);
+    fetchDetail()
+      .then((d) => alive && setDetail(d))
+      .catch(() => alive && setMissing(true));
     return () => {
       alive = false;
     };
-  }, [taskId]);
+  }, [fetchDetail]);
+
+  // Stay in sync when the same task is edited elsewhere (e.g. inline rename in
+  // the list) — the list broadcasts the patch so the open panel reflects it.
+  useEffect(() => {
+    const onUpdated = (e: Event) => {
+      const { id, patch } = (e as CustomEvent<{ id: string; patch: UpdateTaskInput }>).detail;
+      setDetail((d) => (d && d.task.id === id ? { ...d, task: { ...d.task, ...patch } } : d));
+    };
+    window.addEventListener('iw:task-updated', onUpdated);
+    return () => window.removeEventListener('iw:task-updated', onUpdated);
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -73,14 +89,22 @@ export function DetailPanel({ taskId, onClose }: { taskId: string; onClose: () =
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const patch = useCallback(
-    async (p: UpdateTaskInput) => {
-      const updated = await updateTask(taskId, p);
-      setDetail((d) => (d ? { ...d, task: updated } : d));
-      router.refresh();
-    },
-    [taskId, router],
-  );
+  if (missing) {
+    return (
+      <section className="detail-panel">
+        <div className="dp-head">
+          <span className="ref-tag ref-big">{taskRef ?? 'Task'}</span>
+          <span className="spacer" />
+          <button className="icon-btn" onClick={onClose} aria-label="Close">
+            <Ic.close size={18} />
+          </button>
+        </div>
+        <div className="dp-body">
+          <p className="dp-section-label">This task no longer exists.</p>
+        </div>
+      </section>
+    );
+  }
 
   if (!detail) {
     return (
@@ -96,13 +120,26 @@ export function DetailPanel({ taskId, onClose }: { taskId: string; onClose: () =
   }
 
   const { task, displayRef, parent, children, comments, modules, milestones } = detail;
+  const tid = task.id;
   const pending = task.status === 'pending';
   const subDone = children.filter((c) => c.done).length;
   const taskModule = modules.find((m) => m.id === task.moduleId);
   const milestoneName = milestones.find((m) => m.id === task.milestoneId)?.name;
 
+  const reload = async () => {
+    const fresh = await fetchDetail();
+    setDetail(fresh);
+    router.refresh();
+  };
+
+  const patch = async (p: UpdateTaskInput) => {
+    const updated = await updateTask(tid, p);
+    setDetail((d) => (d ? { ...d, task: updated } : d));
+    router.refresh();
+  };
+
   const onDelete = async () => {
-    await deleteTask(taskId);
+    await deleteTask(tid);
     onClose();
     router.refresh();
   };
@@ -119,7 +156,7 @@ export function DetailPanel({ taskId, onClose }: { taskId: string; onClose: () =
 
       <div className="dp-body">
         {parent && (
-          <button className="dp-parent" type="button" onClick={() => openOther(parent.id)}>
+          <button className="dp-parent" type="button" onClick={() => openTask(parent)}>
             <Ic.cornerDownRight size={13} /> Sub-task of · <b>{parent.title}</b>
             {parent.ref && <span className="dp-parent-ref">{parent.ref}</span>}
           </button>
@@ -133,7 +170,7 @@ export function DetailPanel({ taskId, onClose }: { taskId: string; onClose: () =
           value={task.statusNote ?? ''}
           pending={pending}
           onSave={async (note) => {
-            const updated = await setTaskStatusNote(taskId, note);
+            const updated = await setTaskStatusNote(tid, note);
             setDetail((d) => (d ? { ...d, task: updated } : d));
             router.refresh();
           }}
@@ -316,7 +353,7 @@ export function DetailPanel({ taskId, onClose }: { taskId: string; onClose: () =
               <SubRow
                 key={c.id}
                 child={c}
-                onOpen={() => openOther(c.id)}
+                onOpen={() => openTask(c)}
                 onToggle={async () => {
                   // Flip the sub-task circle now (matches the panel's manual-optimistic pattern), then reconcile.
                   setDetail((d) => (d ? { ...d, children: d.children.map((x) => (x.id === c.id ? { ...x, ...toggledDone(x.status) } : x)) } : d));
@@ -348,8 +385,8 @@ export function DetailPanel({ taskId, onClose }: { taskId: string; onClose: () =
           ))}
           <CommentBox
             onSend={async (body) => {
-              await addTaskComment(taskId, body);
-              const fresh = await getTaskDetail(taskId);
+              await addTaskComment(tid, body);
+              const fresh = await fetchDetail();
               setDetail(fresh);
               router.refresh();
             }}
@@ -379,13 +416,31 @@ export function DetailPanel({ taskId, onClose }: { taskId: string; onClose: () =
 }
 
 function TitleEditor({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
   const [v, setV] = useState(value);
+
+  // Reflect external edits (e.g. inline rename in the list) into the field.
+  // `value` only changes on a real external update, never mid-typing here, so
+  // this won't clobber in-progress input.
+  useEffect(() => setV(value), [value]);
+
+  // Auto-grow to fit the full title — a fixed rows={1} textarea clipped long
+  // titles to one line in both display and edit (IW-10).
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [v]);
+
   return (
     <textarea
+      ref={ref}
       className="dp-title-input"
       value={v}
       rows={1}
       onChange={(e) => setV(e.target.value)}
+      onKeyDown={commitOnEnter}
       onBlur={() => v.trim() && v !== value && onSave(v.trim())}
       spellCheck={false}
     />

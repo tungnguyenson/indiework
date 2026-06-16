@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { EmojiPicker } from '@/components/ui/emoji-picker';
 import { Ic } from '@/components/ui/icons';
 import { updateProject } from '@/app/_actions/projects';
+import { commitOnEnter } from '@/lib/inline-edit';
 import {
   BUILTIN_VIEWS,
   DEFAULT_VIEW,
@@ -18,6 +19,7 @@ interface ProjectLite {
   key: string;
   name: string;
   emoji: string | null;
+  pinned: boolean;
 }
 
 /**
@@ -48,7 +50,7 @@ export function ProjectTabs({
   const [name, setName] = useState(project.name);
   const base = `/app/p/${project.key}`;
 
-  const save = async (patch: { name?: string; emoji?: string }) => {
+  const save = async (patch: { name?: string; emoji?: string; pinned?: boolean }) => {
     await updateProject(project.id, patch);
     router.refresh();
   };
@@ -64,10 +66,22 @@ export function ProjectTabs({
           className="tabs-lead-name"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          onKeyDown={commitOnEnter}
           onBlur={() => name.trim() && name !== project.name && save({ name: name.trim() })}
           spellCheck={false}
           aria-label="Project name"
         />
+        <button
+          className="tabs-lead-pin"
+          type="button"
+          data-on={project.pinned ? '' : undefined}
+          aria-pressed={project.pinned}
+          title={project.pinned ? 'Unpin project' : 'Pin project'}
+          aria-label={project.pinned ? 'Unpin project' : 'Pin project'}
+          onClick={() => save({ pinned: !project.pinned })}
+        >
+          <Ic.pin size={15} fill={project.pinned ? 'currentColor' : 'none'} />
+        </button>
         <span className="tabs-lead-sep" />
       </div>
 
@@ -146,7 +160,7 @@ function CustomTab({
             else setLabel(view.label);
           }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+            commitOnEnter(e);
             if (e.key === 'Escape') {
               setLabel(view.label);
               setEditing(false);

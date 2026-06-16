@@ -7,10 +7,10 @@ import { API_KEY_SCOPE, type ApiKeyScope } from '@/lib/domain';
 import { fmtDate } from '@/lib/dates';
 import { updateWorkspace } from '@/app/_actions/workspace';
 import { createApiKey, revokeApiKey } from '@/app/_actions/apikeys';
-import { EmojiPicker } from '@/components/ui/emoji-picker';
 import { Ic } from '@/components/ui/icons';
 import { UI_FONTS } from '@/lib/fonts';
 import { useUiFont } from '@/lib/use-ui-font';
+import { commitOnEnter } from '@/lib/inline-edit';
 
 interface Workspace {
   id: string;
@@ -19,24 +19,23 @@ interface Workspace {
   tagline: string | null;
 }
 
-type SettingsSection = 'general' | 'appearance' | 'api';
+type SettingsSection = 'appearance' | 'api';
 
 /** Neutral English default for the font preview; users can type their own
  *  (Vietnamese, currency, anything) to test a face. */
 const FONT_SAMPLE_DEFAULT = 'Plan, build & ship — $12,840';
 
 const SECTIONS: { id: SettingsSection; label: string; icon: keyof typeof Ic }[] = [
-  { id: 'general', label: 'General', icon: 'sun' },
   { id: 'appearance', label: 'Appearance', icon: 'type' },
   { id: 'api', label: 'API keys', icon: 'key' },
 ];
 
+/** App-wide settings: appearance + API keys. Workspace identity lives on its
+ *  own screen ({@link WorkspaceSettingsScreen}) reached from the switcher. */
 export function SettingsScreen({
-  workspace,
   apiKeys,
-  initialSection = 'api',
+  initialSection = 'appearance',
 }: {
-  workspace: Workspace | null;
   apiKeys: ApiKeyPublic[];
   initialSection?: SettingsSection;
 }) {
@@ -62,7 +61,6 @@ export function SettingsScreen({
         })}
       </nav>
       <div className="settings-main">
-        {section === 'general' && <GeneralPane workspace={workspace} />}
         {section === 'appearance' && <AppearancePane />}
         {section === 'api' && <ApiKeysPane apiKeys={apiKeys} />}
       </div>
@@ -120,37 +118,52 @@ function AppearancePane() {
   );
 }
 
-function GeneralPane({ workspace }: { workspace: Workspace | null }) {
+/** Workspace identity — its own focused screen (route: /app/settings/workspace),
+ *  separate from app-wide settings. */
+export function WorkspaceSettingsScreen({ workspace }: { workspace: Workspace | null }) {
   const router = useRouter();
-  if (!workspace) return <p className="settings-sub">No workspace.</p>;
+  if (!workspace) {
+    return (
+      <div className="settings settings-solo">
+        <div className="settings-main">
+          <div className="settings-pane">
+            <h1 className="settings-h">Workspace</h1>
+            <p className="settings-sub">No workspace.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
   const save = async (patch: Parameters<typeof updateWorkspace>[1]) => {
     await updateWorkspace(workspace.id, patch);
     router.refresh();
   };
   return (
-    <div className="settings-pane">
-      <h1 className="settings-h">General</h1>
-      <p className="settings-sub">Your workspace identity. It shows at the top of the sidebar.</p>
-      <div className="set-card">
-        <div className="set-field">
-          <label>Icon</label>
-          <EmojiPicker value={workspace.emoji ?? '◈'} onPick={(e) => save({ emoji: e })} triggerClass="emoji-solo" />
-        </div>
-        <div className="set-field">
-          <label>Name</label>
-          <input
-            className="set-input"
-            defaultValue={workspace.name}
-            onBlur={(e) => e.target.value.trim() && e.target.value !== workspace.name && save({ name: e.target.value.trim() })}
-          />
-        </div>
-        <div className="set-field">
-          <label>Tagline</label>
-          <input
-            className="set-input"
-            defaultValue={workspace.tagline ?? ''}
-            onBlur={(e) => e.target.value !== (workspace.tagline ?? '') && save({ tagline: e.target.value || null })}
-          />
+    <div className="settings settings-solo">
+      <div className="settings-main">
+        <div className="settings-pane">
+          <h1 className="settings-h">Workspace</h1>
+          <p className="settings-sub">Your workspace identity — the name shows at the top of the sidebar.</p>
+          <div className="set-card">
+            <div className="set-field">
+              <label>Name</label>
+              <input
+                className="set-input"
+                defaultValue={workspace.name}
+                onKeyDown={commitOnEnter}
+                onBlur={(e) => e.target.value.trim() && e.target.value !== workspace.name && save({ name: e.target.value.trim() })}
+              />
+            </div>
+            <div className="set-field">
+              <label>Tagline</label>
+              <input
+                className="set-input"
+                defaultValue={workspace.tagline ?? ''}
+                onKeyDown={commitOnEnter}
+                onBlur={(e) => e.target.value !== (workspace.tagline ?? '') && save({ tagline: e.target.value || null })}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -6,6 +6,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import type { ShellData } from '@/server/load';
 import { PROJECT_STATUS, PROJECT_STATUS_LABEL, type ProjectStatus } from '@/lib/domain';
 import { setActiveWorkspace } from '@/app/_actions/workspace';
+import { updateProject } from '@/app/_actions/projects';
+import { BrandMark } from '@/components/ui/brand';
 import { Popover } from '@/components/ui/popover';
 import { Ic } from '@/components/ui/icons';
 
@@ -42,6 +44,11 @@ export function Sidebar({
 
   const groups = useMemo(() => buildGroups(projects), [projects]);
 
+  const togglePin = async (id: string, pinned: boolean) => {
+    await updateProject(id, { pinned: !pinned });
+    router.refresh();
+  };
+
   const toggle = (key: string) =>
     setCollapsed((prev) => {
       const next = new Set(prev);
@@ -63,7 +70,7 @@ export function Sidebar({
         className="ws-pop-wrap"
         trigger={
           <button className="ws-switch" type="button">
-            <span className="ws-brand">{activeWorkspace?.emoji ?? '◈'}</span>
+            <BrandMark size={30} className="ws-mark" />
             <span className="ws-meta">
               <b>{activeWorkspace?.name ?? 'Workspace'}</b>
               <small>{activeWorkspace?.tagline ?? 'personal projects'}</small>
@@ -87,9 +94,6 @@ export function Sidebar({
                 }}
                 type="button"
               >
-                <span className="ws-brand" style={{ width: 26, height: 26 }}>
-                  {w.emoji ?? '◈'}
-                </span>
                 <span className="ws-opt-text">
                   <b>{w.name}</b>
                   <small>{w.tagline}</small>
@@ -107,7 +111,7 @@ export function Sidebar({
             >
               <Ic.plus size={15} /> New workspace
             </button>
-            <Link className="ws-action" href="/app/settings" onClick={close}>
+            <Link className="ws-action" href="/app/settings/workspace" onClick={close}>
               <Ic.settings size={15} /> Workspace settings
             </Link>
           </div>
@@ -159,20 +163,31 @@ export function Sidebar({
                   {g.items.map((p) => {
                     const href = `/app/p/${p.key}`;
                     return (
-                      <Link
-                        key={p.id}
-                        className="nav-item"
-                        href={href}
-                        data-active={pathname.startsWith(href) ? '' : undefined}
-                      >
-                        <span className="nav-emoji">{p.emoji ?? '•'}</span>
-                        <span className="nav-label">{p.name}</span>
-                        {p.issues > 0 && (
-                          <span className="nav-badge" data-muted="">
-                            {p.issues}
-                          </span>
-                        )}
-                      </Link>
+                      <div className="nav-item-wrap" key={p.id}>
+                        <Link
+                          className="nav-item"
+                          href={href}
+                          data-active={pathname.startsWith(href) ? '' : undefined}
+                        >
+                          <span className="nav-emoji">{p.emoji ?? '•'}</span>
+                          <span className="nav-label">{p.name}</span>
+                          {p.issues > 0 && (
+                            <span className="nav-badge" data-muted="">
+                              {p.issues}
+                            </span>
+                          )}
+                        </Link>
+                        <button
+                          className="nav-pin"
+                          type="button"
+                          data-on={p.pinned ? '' : undefined}
+                          title={p.pinned ? 'Unpin' : 'Pin'}
+                          aria-label={p.pinned ? `Unpin ${p.name}` : `Pin ${p.name}`}
+                          onClick={() => togglePin(p.id, p.pinned)}
+                        >
+                          <Ic.pin size={13} fill={p.pinned ? 'currentColor' : 'none'} />
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -194,7 +209,7 @@ export function Sidebar({
         <Link
           className="sb-footbtn"
           href="/app/settings"
-          data-active={pathname.startsWith('/app/settings') ? '' : undefined}
+          data-active={pathname === '/app/settings' ? '' : undefined}
         >
           <Ic.settings size={16} /> Settings
         </Link>

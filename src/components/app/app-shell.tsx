@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import type { ShellData } from '@/server/load';
+import { useTaskNav, refFromPath } from '@/lib/task-nav';
 import { Sidebar } from './sidebar';
 import { DetailPanel } from './detail-panel';
 import { ProjectForm } from './project-form';
@@ -11,10 +12,14 @@ import { CommandPalette } from './command-palette';
 import { Ic } from '@/components/ui/icons';
 
 export function AppShell({ shell, children }: { shell: ShellData; children: ReactNode }) {
-  const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const taskId = params.get('task');
+  const { closeTask } = useTaskNav();
+  // The open task comes from a ref path (/app/p/IW/issue/IW-11/slug) for project
+  // tasks, or the legacy ?task=<uuid> overlay for Inbox tasks (no ref yet).
+  const taskRef = refFromPath(pathname)?.ref ?? null;
+  const legacyTaskId = params.get('task');
+  const detailKey = taskRef ?? legacyTaskId;
 
   const [width, setWidth] = useState(256);
   const [resizing, setResizing] = useState(false);
@@ -59,13 +64,6 @@ export function AppShell({ shell, children }: { shell: ShellData; children: Reac
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const closeDetail = useCallback(() => {
-    const sp = new URLSearchParams(Array.from(params.entries()));
-    sp.delete('task');
-    const qs = sp.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  }, [params, pathname, router]);
-
   const startResize = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setResizing(true);
@@ -83,7 +81,7 @@ export function AppShell({ shell, children }: { shell: ShellData; children: Reac
   return (
     <div
       className="app"
-      data-detail={taskId ? '' : undefined}
+      data-detail={detailKey ? '' : undefined}
       data-resizing={resizing ? '' : undefined}
       data-sb-collapsed={collapsed ? '' : undefined}
       style={{ '--sidebar-w': `${collapsed ? 0 : width}px` } as React.CSSProperties}
@@ -104,7 +102,10 @@ export function AppShell({ shell, children }: { shell: ShellData; children: Reac
 
       <div className="main-col">{children}</div>
 
-      {taskId && <DetailPanel taskId={taskId} onClose={closeDetail} />}
+      {/* No key on the panel: switching issues re-fetches in place instead of
+          remounting, so the slide-in animation only plays when opening from
+          closed (not on every issue switch). */}
+      {detailKey && <DetailPanel taskRef={taskRef} taskId={legacyTaskId} onClose={closeTask} />}
 
       {showProject && (
         <ProjectForm

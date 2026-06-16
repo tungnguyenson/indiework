@@ -304,6 +304,12 @@
   border-radius: var(--r-sm); min-width: 0; width: auto; field-sizing: content; max-width: 260px; transition: .12s; }
 .tabs-lead-name:hover { background: var(--bg-hover); }
 .tabs-lead-name:focus { background: var(--bg-surface); border-color: var(--accent-ring); box-shadow: 0 0 0 3px var(--accent-softer); }
+.tabs-lead-pin { border: none; background: none; color: var(--text-muted); width: 28px; height: 28px;
+  border-radius: var(--r-sm); display: grid; place-items: center; cursor: pointer; flex: none;
+  transition: background .12s, color .12s; }
+.tabs-lead-pin:hover { background: var(--bg-hover); color: var(--text-strong); }
+.tabs-lead-pin[data-on] { color: var(--accent); }
+.tabs-lead-pin[data-on]:hover { color: var(--accent); }
 .tabs-lead-sep { width: 1px; height: 19px; background: var(--border); margin: 0 10px 0 6px; align-self: center; flex: none; }
 .tabs-right { margin-left: auto; padding-bottom: 8px; position: sticky; right: 0; z-index: 2;
   background: var(--bg-canvas); padding-left: 12px; display: inline-flex; gap: 6px; }
@@ -631,6 +637,8 @@
    App Settings
    ============================================================ */
 .settings { flex: 1; display: grid; grid-template-columns: 216px 1fr; min-height: 0; overflow: hidden; }
+/* workspace settings is a focused single form — no nav rail */
+.settings-solo { grid-template-columns: 1fr; }
 .settings-nav { border-right: 1px solid var(--border-soft); padding: 22px 12px; display: flex; flex-direction: column; gap: 2px; }
 .settings-navlabel { font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.04em;
   color: var(--text-faint); padding: 4px 10px 10px; }

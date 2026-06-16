@@ -1,7 +1,7 @@
 'use client';
 
-import { startTransition, useCallback, useMemo, useOptimistic, useRef, useState } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { startTransition, useCallback, useLayoutEffect, useMemo, useOptimistic, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { TaskDto } from '@/server/services';
 import {
   buildSections,
@@ -29,7 +29,8 @@ import {
 import { DEFAULT_VIEW, viewAllowsStatus, viewCaptureStatus, useViews, type ViewId } from '@/lib/views';
 import { useLocalStorage } from '@/lib/use-local-storage';
 import { applyTaskOptimistic } from '@/lib/optimistic';
-import { createTask, toggleTaskDone, bulkUpdateTasks, bulkDeleteTasks } from '@/app/_actions/tasks';
+import { useTaskNav, useOpenTaskKey, taskKey } from '@/lib/task-nav';
+import { createTask, updateTask, toggleTaskDone, bulkUpdateTasks, bulkDeleteTasks } from '@/app/_actions/tasks';
 import { ProjectTabs } from './project-tabs';
 import { DisplayPopover, FilterPopover, BoardDisplayPopover } from './display-popover';
 import { BoardView } from './board';
@@ -39,11 +40,17 @@ import { Progress, PriorityBars, ModuleIcon } from '@/components/ui/bits';
 import { Popover, OptionList } from '@/components/ui/popover';
 import { Ic } from '@/components/ui/icons';
 
+// Opening a task navigates to /issue/<ref>/<slug>, which remounts this view.
+// Scroll position is kept in-memory (per project) so the list doesn't jump to
+// the top behind the panel; collapsed sections persist via localStorage below.
+const scrollPositions = new Map<string, number>();
+
 interface Project {
   id: string;
   key: string;
   name: string;
   emoji: string | null;
+  pinned: boolean;
 }
 
 interface DisplayState {
@@ -67,9 +74,9 @@ export function ProjectView({
   tasks: TaskDto[];
 }) {
   const router = useRouter();
-  const pathname = usePathname();
   const params = useSearchParams();
-  const openTaskId = params.get('task');
+  const { openTask } = useTaskNav();
+  const openKey = useOpenTaskKey();
   const activeView = (params.get('view') as ViewId) || DEFAULT_VIEW;
 
   const views = useViews(project.key);
@@ -87,8 +94,22 @@ export function ProjectView({
   const filters = disp.filters;
   const [boardCfg, setBoardCfg] = useLocalStorage<BoardCfg>(`iw-board-${project.key}`, DEFAULT_BOARD_CFG);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // Persisted per project (Set isn't JSON-serializable, so store string[] and
+  // derive the Set) — survives the remount that opening a task triggers.
+  const [collapsedArr, setCollapsedArr] = useLocalStorage<string[]>(`iw-collapsed-${project.key}`, []);
+  const collapsed = useMemo(() => new Set(collapsedArr), [collapsedArr]);
   const lastSel = useRef<string | null>(null);
+
+  // Restore/keep list scroll across the open-task remount.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = scrollPositions.get(project.key) ?? 0;
+  }, [project.key]);
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (el) scrollPositions.set(project.key, el.scrollTop);
+  };
 
   const allowedStatus = useCallback((s: TaskStatus) => viewAllowsStatus(activeView, s), [activeView]);
 
@@ -136,12 +157,6 @@ export function ProjectView({
     [visibleSections],
   );
 
-  const openTask = (id: string) => {
-    const sp = new URLSearchParams(Array.from(params.entries()));
-    sp.set('task', id);
-    router.push(`${pathname}?${sp.toString()}`, { scroll: false });
-  };
-
   const toggleSelect = useCallback(
     (id: string, shift: boolean) => {
       setSelected((prev) => {
@@ -165,17 +180,31 @@ export function ProjectView({
   );
 
   const toggleCollapse = (key: string) =>
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
+    setCollapsedArr((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
 
   const add = async (title: string, patch: Sec['patch'] = {}) => {
     const captureStatus = viewCaptureStatus(activeView);
-    await createTask({ projectId: project.id, title, ...(captureStatus ? { status: captureStatus } : {}), ...patch });
+    const task = await createTask({ projectId: project.id, title, ...(captureStatus ? { status: captureStatus } : {}), ...patch });
     router.refresh();
+    return task;
   };
+  // IW-8: adding inside a section opens the new task's detail panel; the top
+  // quick-capture stays put so rapid dumping isn't interrupted.
+  const addAndOpen = async (title: string, patch: Sec['patch'] = {}) => {
+    const task = await add(title, patch);
+    if (task) openTask(task);
+  };
+  const onRename = useCallback(
+    (id: string, title: string) => {
+      // Let an open detail panel for this task reflect the rename immediately.
+      window.dispatchEvent(new CustomEvent('iw:task-updated', { detail: { id, patch: { title } } }));
+      startTransition(async () => {
+        applyOptimistic({ kind: 'patch', ids: [id], patch: { title } });
+        await updateTask(id, { title });
+      });
+    },
+    [applyOptimistic],
+  );
   const onToggleDone = (id: string) => {
     startTransition(async () => {
       applyOptimistic({ kind: 'toggleDone', id });
@@ -231,12 +260,12 @@ export function ProjectView({
           </>
         }
       />
-      <QuickCapture placeholder="Add a task…  (it lands in this project)" onAdd={(t) => add(t)} />
+      <QuickCapture placeholder="Add a task…  (it lands in this project)" onAdd={(t) => void add(t)} />
 
       {mode === 'board' ? (
         <BoardView project={project} modules={modules} milestones={milestones} tasks={scoped} cfg={boardCfg} />
       ) : (
-        <div className="scroll-body" data-group-style={disp.groupStyle ?? 'band'}>
+        <div className="scroll-body" data-group-style={disp.groupStyle ?? 'band'} ref={scrollRef} onScroll={onScroll}>
           {anyTasks ? (
             visibleSections.map((section) => (
               <Section
@@ -251,15 +280,16 @@ export function ProjectView({
                 fields={filters.fields}
                 showModule={effPrimary !== 'module' && effSecondary !== 'module'}
                 showMilestone={effPrimary !== 'milestone' && effSecondary !== 'milestone'}
-                openTaskId={openTaskId}
+                openKey={openKey}
                 selected={selected}
                 selMode={selMode}
                 onOpen={openTask}
+                onRename={onRename}
                 onToggleDone={onToggleDone}
                 onToggleSelect={toggleSelect}
                 collapsedSet={collapsed}
                 toggleCollapse={toggleCollapse}
-                onAdd={add}
+                onAdd={addAndOpen}
               />
             ))
           ) : (
@@ -337,10 +367,11 @@ function Section({
   fields,
   showModule,
   showMilestone,
-  openTaskId,
+  openKey,
   selected,
   selMode,
   onOpen,
+  onRename,
   onToggleDone,
   onToggleSelect,
   collapsedSet,
@@ -357,10 +388,11 @@ function Section({
   fields: FieldVis;
   showModule: boolean;
   showMilestone: boolean;
-  openTaskId: string | null;
+  openKey: string | null;
   selected: Set<string>;
   selMode: boolean;
-  onOpen: (id: string) => void;
+  onOpen: (task: TaskDto) => void;
+  onRename: (id: string, title: string) => void;
   onToggleDone: (id: string) => void;
   onToggleSelect: (id: string, shift: boolean) => void;
   collapsedSet: Set<string>;
@@ -376,15 +408,16 @@ function Section({
       task={t}
       module={t.moduleId ? moduleMap.get(t.moduleId) : undefined}
       milestone={t.milestoneId ? milestoneMap.get(t.milestoneId) : undefined}
-      selected={openTaskId === t.id}
+      selected={openKey === taskKey(t)}
       checked={selected.has(t.id)}
       selMode={selMode}
       fields={fields}
       childTasks={childrenMap.get(t.id)}
       showSubtasks={showSubtasks}
-      openTaskId={openTaskId}
+      openKey={openKey}
       onToggleDone={onToggleDone}
       onOpen={onOpen}
+      onRename={onRename}
       onToggleSelect={(shift) => onToggleSelect(t.id, shift)}
       showModule={showModule}
       showMilestone={showMilestone}

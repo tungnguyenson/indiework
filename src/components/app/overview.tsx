@@ -20,6 +20,7 @@ import {
 } from '@/lib/domain';
 import { fmtDate, toDateInputValue } from '@/lib/dates';
 import { mdToHtml } from '@/lib/markdown';
+import { commitOnEnter } from '@/lib/inline-edit';
 import { PROJECT_COLORS } from '@/lib/colors';
 import { updateProject } from '@/app/_actions/projects';
 import {
@@ -59,6 +60,7 @@ interface Project {
   key: string;
   name: string;
   emoji: string | null;
+  pinned: boolean;
   status: ProjectStatus;
   tags: string[];
   shortDesc: string | null;
@@ -70,7 +72,6 @@ interface Project {
 interface WorkspaceOpt {
   id: string;
   name: string;
-  emoji: string | null;
 }
 
 type OvTab = 'info' | 'milestones' | 'modules';
@@ -145,6 +146,7 @@ function InfoPanel({ project, workspaces }: { project: Project; workspaces: Work
           className="ov-input"
           defaultValue={project.shortDesc ?? ''}
           placeholder="One line about this project"
+          onKeyDown={commitOnEnter}
           onBlur={(e) => e.target.value !== (project.shortDesc ?? '') && save({ shortDesc: e.target.value || null })}
         />
 
@@ -185,6 +187,7 @@ function InfoPanel({ project, workspaces }: { project: Project; workspaces: Work
           className="ov-input"
           defaultValue={project.statusNote ?? ''}
           placeholder="Where is this project right now?"
+          onKeyDown={commitOnEnter}
           onBlur={(e) => e.target.value !== (project.statusNote ?? '') && save({ statusNote: e.target.value || null })}
         />
 
@@ -196,10 +199,7 @@ function InfoPanel({ project, workspaces }: { project: Project; workspaces: Work
                 width={220}
                 trigger={
                   <button className="ov-pickbtn" type="button">
-                    <span className="pstatus">
-                      <span>{currentWs?.emoji ?? '◈'}</span>
-                      {currentWs?.name ?? 'No workspace'}
-                    </span>
+                    {currentWs?.name ?? 'No workspace'}
                   </button>
                 }
               >
@@ -210,15 +210,6 @@ function InfoPanel({ project, workspaces }: { project: Project; workspaces: Work
                     onPick={(id) => {
                       if (id !== project.workspaceId) save({ workspaceId: id });
                       close();
-                    }}
-                    renderOpt={(o) => {
-                      const ws = workspaces.find((w) => w.id === o.id);
-                      return (
-                        <>
-                          <span>{ws?.emoji ?? '◈'}</span>
-                          {o.label}
-                        </>
-                      );
                     }}
                   />
                 )}
@@ -287,6 +278,7 @@ function MilestonesPanel({
               <input
                 className="ov-rowname"
                 defaultValue={m.name}
+                onKeyDown={commitOnEnter}
                 onBlur={(e) => e.target.value.trim() && e.target.value !== m.name && saveMile(m.id, { name: e.target.value.trim() }, router)}
               />
               <button
@@ -393,6 +385,7 @@ function ModulesPanel({
               <input
                 className="ov-rowname"
                 defaultValue={m.name}
+                onKeyDown={commitOnEnter}
                 onBlur={async (e) => {
                   if (e.target.value.trim() && e.target.value !== m.name) {
                     await updateModule(m.id, { name: e.target.value.trim() });
@@ -430,6 +423,7 @@ function ModulesPanel({
               className="ov-mod-desc"
               defaultValue={m.description ?? ''}
               placeholder="What does this module cover?"
+              onKeyDown={commitOnEnter}
               onBlur={async (e) => {
                 if (e.target.value !== (m.description ?? '')) {
                   await updateModule(m.id, { description: e.target.value || null });
