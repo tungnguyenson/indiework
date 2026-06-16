@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { EmojiPicker } from '@/components/ui/emoji-picker';
 import { Ic } from '@/components/ui/icons';
 import { updateProject } from '@/app/_actions/projects';
+import { commitOnEnter } from '@/lib/inline-edit';
 import {
   BUILTIN_VIEWS,
   DEFAULT_VIEW,
@@ -65,6 +66,7 @@ export function ProjectTabs({
           className="tabs-lead-name"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          onKeyDown={commitOnEnter}
           onBlur={() => name.trim() && name !== project.name && save({ name: name.trim() })}
           spellCheck={false}
           aria-label="Project name"
@@ -158,7 +160,7 @@ function CustomTab({
             else setLabel(view.label);
           }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+            commitOnEnter(e);
             if (e.key === 'Escape') {
               setLabel(view.label);
               setEditing(false);

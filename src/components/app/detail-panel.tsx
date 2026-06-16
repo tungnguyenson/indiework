@@ -25,6 +25,7 @@ import {
 } from '@/lib/domain';
 import { fmtDate, fmtDay, toDateInputValue } from '@/lib/dates';
 import { mdToHtml } from '@/lib/markdown';
+import { commitOnEnter } from '@/lib/inline-edit';
 import type { UpdateTaskInput } from '@/server/validators/task';
 import { useTaskNav } from '@/lib/task-nav';
 import { Popover, OptionList } from '@/components/ui/popover';
@@ -439,6 +440,7 @@ function TitleEditor({ value, onSave }: { value: string; onSave: (v: string) => 
       value={v}
       rows={1}
       onChange={(e) => setV(e.target.value)}
+      onKeyDown={commitOnEnter}
       onBlur={() => v.trim() && v !== value && onSave(v.trim())}
       spellCheck={false}
     />

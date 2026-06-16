@@ -20,6 +20,7 @@ import {
 } from '@/lib/domain';
 import { fmtDate, toDateInputValue } from '@/lib/dates';
 import { mdToHtml } from '@/lib/markdown';
+import { commitOnEnter } from '@/lib/inline-edit';
 import { PROJECT_COLORS } from '@/lib/colors';
 import { updateProject } from '@/app/_actions/projects';
 import {
@@ -145,6 +146,7 @@ function InfoPanel({ project, workspaces }: { project: Project; workspaces: Work
           className="ov-input"
           defaultValue={project.shortDesc ?? ''}
           placeholder="One line about this project"
+          onKeyDown={commitOnEnter}
           onBlur={(e) => e.target.value !== (project.shortDesc ?? '') && save({ shortDesc: e.target.value || null })}
         />
 
@@ -185,6 +187,7 @@ function InfoPanel({ project, workspaces }: { project: Project; workspaces: Work
           className="ov-input"
           defaultValue={project.statusNote ?? ''}
           placeholder="Where is this project right now?"
+          onKeyDown={commitOnEnter}
           onBlur={(e) => e.target.value !== (project.statusNote ?? '') && save({ statusNote: e.target.value || null })}
         />
 
@@ -275,6 +278,7 @@ function MilestonesPanel({
               <input
                 className="ov-rowname"
                 defaultValue={m.name}
+                onKeyDown={commitOnEnter}
                 onBlur={(e) => e.target.value.trim() && e.target.value !== m.name && saveMile(m.id, { name: e.target.value.trim() }, router)}
               />
               <button
@@ -381,6 +385,7 @@ function ModulesPanel({
               <input
                 className="ov-rowname"
                 defaultValue={m.name}
+                onKeyDown={commitOnEnter}
                 onBlur={async (e) => {
                   if (e.target.value.trim() && e.target.value !== m.name) {
                     await updateModule(m.id, { name: e.target.value.trim() });
@@ -418,6 +423,7 @@ function ModulesPanel({
               className="ov-mod-desc"
               defaultValue={m.description ?? ''}
               placeholder="What does this module cover?"
+              onKeyDown={commitOnEnter}
               onBlur={async (e) => {
                 if (e.target.value !== (m.description ?? '')) {
                   await updateModule(m.id, { description: e.target.value || null });

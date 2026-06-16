@@ -10,6 +10,7 @@ import { createApiKey, revokeApiKey } from '@/app/_actions/apikeys';
 import { Ic } from '@/components/ui/icons';
 import { UI_FONTS } from '@/lib/fonts';
 import { useUiFont } from '@/lib/use-ui-font';
+import { commitOnEnter } from '@/lib/inline-edit';
 
 interface Workspace {
   id: string;
@@ -149,6 +150,7 @@ export function WorkspaceSettingsScreen({ workspace }: { workspace: Workspace | 
               <input
                 className="set-input"
                 defaultValue={workspace.name}
+                onKeyDown={commitOnEnter}
                 onBlur={(e) => e.target.value.trim() && e.target.value !== workspace.name && save({ name: e.target.value.trim() })}
               />
             </div>
@@ -157,6 +159,7 @@ export function WorkspaceSettingsScreen({ workspace }: { workspace: Workspace | 
               <input
                 className="set-input"
                 defaultValue={workspace.tagline ?? ''}
+                onKeyDown={commitOnEnter}
                 onBlur={(e) => e.target.value !== (workspace.tagline ?? '') && save({ tagline: e.target.value || null })}
               />
             </div>
