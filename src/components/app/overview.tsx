@@ -70,7 +70,6 @@ interface Project {
 interface WorkspaceOpt {
   id: string;
   name: string;
-  emoji: string | null;
 }
 
 type OvTab = 'info' | 'milestones' | 'modules';
@@ -196,10 +195,7 @@ function InfoPanel({ project, workspaces }: { project: Project; workspaces: Work
                 width={220}
                 trigger={
                   <button className="ov-pickbtn" type="button">
-                    <span className="pstatus">
-                      <span>{currentWs?.emoji ?? '◈'}</span>
-                      {currentWs?.name ?? 'No workspace'}
-                    </span>
+                    {currentWs?.name ?? 'No workspace'}
                   </button>
                 }
               >
@@ -210,15 +206,6 @@ function InfoPanel({ project, workspaces }: { project: Project; workspaces: Work
                     onPick={(id) => {
                       if (id !== project.workspaceId) save({ workspaceId: id });
                       close();
-                    }}
-                    renderOpt={(o) => {
-                      const ws = workspaces.find((w) => w.id === o.id);
-                      return (
-                        <>
-                          <span>{ws?.emoji ?? '◈'}</span>
-                          {o.label}
-                        </>
-                      );
                     }}
                   />
                 )}

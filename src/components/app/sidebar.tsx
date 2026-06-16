@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import type { ShellData } from '@/server/load';
 import { PROJECT_STATUS, PROJECT_STATUS_LABEL, type ProjectStatus } from '@/lib/domain';
 import { setActiveWorkspace } from '@/app/_actions/workspace';
+import { BrandMark } from '@/components/ui/brand';
 import { Popover } from '@/components/ui/popover';
 import { Ic } from '@/components/ui/icons';
 
@@ -63,7 +64,7 @@ export function Sidebar({
         className="ws-pop-wrap"
         trigger={
           <button className="ws-switch" type="button">
-            <span className="ws-brand">{activeWorkspace?.emoji ?? '◈'}</span>
+            <BrandMark size={30} className="ws-mark" />
             <span className="ws-meta">
               <b>{activeWorkspace?.name ?? 'Workspace'}</b>
               <small>{activeWorkspace?.tagline ?? 'personal projects'}</small>
@@ -87,9 +88,6 @@ export function Sidebar({
                 }}
                 type="button"
               >
-                <span className="ws-brand" style={{ width: 26, height: 26 }}>
-                  {w.emoji ?? '◈'}
-                </span>
                 <span className="ws-opt-text">
                   <b>{w.name}</b>
                   <small>{w.tagline}</small>
@@ -107,7 +105,7 @@ export function Sidebar({
             >
               <Ic.plus size={15} /> New workspace
             </button>
-            <Link className="ws-action" href="/app/settings" onClick={close}>
+            <Link className="ws-action" href="/app/settings/workspace" onClick={close}>
               <Ic.settings size={15} /> Workspace settings
             </Link>
           </div>
@@ -194,7 +192,7 @@ export function Sidebar({
         <Link
           className="sb-footbtn"
           href="/app/settings"
-          data-active={pathname.startsWith('/app/settings') ? '' : undefined}
+          data-active={pathname === '/app/settings' ? '' : undefined}
         >
           <Ic.settings size={16} /> Settings
         </Link>

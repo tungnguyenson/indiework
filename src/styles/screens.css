@@ -631,6 +631,8 @@
    App Settings
    ============================================================ */
 .settings { flex: 1; display: grid; grid-template-columns: 216px 1fr; min-height: 0; overflow: hidden; }
+/* workspace settings is a focused single form — no nav rail */
+.settings-solo { grid-template-columns: 1fr; }
 .settings-nav { border-right: 1px solid var(--border-soft); padding: 22px 12px; display: flex; flex-direction: column; gap: 2px; }
 .settings-navlabel { font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.04em;
   color: var(--text-faint); padding: 4px 10px 10px; }
