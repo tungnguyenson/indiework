@@ -14,7 +14,7 @@ async function withCounts<T extends { id: string }>(rows: T[]) {
   const counts = await db
     .select({
       projectId: schema.tasks.projectId,
-      n: sql<number>`count(*)::int`,
+      n: sql<number>`cast(count(*) as integer)`, // portable across pg + sqlite (vs `::int`)
     })
     .from(schema.tasks)
     .where(

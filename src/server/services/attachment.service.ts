@@ -48,7 +48,7 @@ export const attachmentService = {
   /** Attachment counts for a set of tasks (one query) → Map<taskId, count>. */
   async countsForProject(projectId: string): Promise<Map<string, number>> {
     const rows = await db
-      .select({ taskId: schema.attachments.taskId, count: sql<number>`count(*)::int` })
+      .select({ taskId: schema.attachments.taskId, count: sql<number>`cast(count(*) as integer)` })
       .from(schema.attachments)
       .innerJoin(schema.tasks, eq(schema.attachments.taskId, schema.tasks.id))
       .where(eq(schema.tasks.projectId, projectId))
