@@ -310,6 +310,8 @@ export function ProjectView({
       {selMode && (
         <BulkBar
           count={selected.size}
+          modules={modules}
+          milestones={milestones}
           onSetStatus={(status) => {
             const ids = [...selected];
             clearSel();
@@ -324,6 +326,22 @@ export function ProjectView({
             startTransition(async () => {
               applyOptimistic({ kind: 'patch', ids, patch: { priority } });
               await bulkUpdateTasks(ids, { priority });
+            });
+          }}
+          onSetModule={(moduleId) => {
+            const ids = [...selected];
+            clearSel();
+            startTransition(async () => {
+              applyOptimistic({ kind: 'patch', ids, patch: { moduleId } });
+              await bulkUpdateTasks(ids, { moduleId });
+            });
+          }}
+          onSetMilestone={(milestoneId) => {
+            const ids = [...selected];
+            clearSel();
+            startTransition(async () => {
+              applyOptimistic({ kind: 'patch', ids, patch: { milestoneId } });
+              await bulkUpdateTasks(ids, { milestoneId });
             });
           }}
           onMarkDone={() => {
@@ -521,15 +539,23 @@ function InlineAdd({ onAdd }: { onAdd: (title: string) => void }) {
 
 function BulkBar({
   count,
+  modules,
+  milestones,
   onSetStatus,
   onSetPriority,
+  onSetModule,
+  onSetMilestone,
   onMarkDone,
   onDelete,
   onClear,
 }: {
   count: number;
+  modules: GroupModule[];
+  milestones: GroupMilestone[];
   onSetStatus: (s: TaskStatus) => void;
   onSetPriority: (p: TaskPriority) => void;
+  onSetModule: (moduleId: string | null) => void;
+  onSetMilestone: (milestoneId: string | null) => void;
   onMarkDone: () => void;
   onDelete: () => void;
   onClear: () => void;
@@ -585,6 +611,73 @@ function BulkBar({
               </>
             )}
           />
+        )}
+      </Popover>
+      <Popover
+        width={210}
+        trigger={
+          <button className="bulkbar-btn" type="button">
+            <Ic.cube size={15} /> Module
+          </button>
+        }
+      >
+        {(close) => (
+          <>
+            <div className="pop-label">Set module</div>
+            <OptionList
+              options={[
+                { id: '', label: 'No module', icon: null as string | null, color: null as string | null },
+                ...modules.map((m) => ({ id: m.id, label: m.name, icon: m.icon ?? null, color: m.color })),
+              ]}
+              onPick={(id) => {
+                onSetModule(id || null);
+                close();
+              }}
+              renderOpt={(o) =>
+                o.id === '' ? (
+                  <>
+                    <Ic.close size={15} /> {o.label}
+                  </>
+                ) : (
+                  <>
+                    <ModuleIcon icon={o.icon} color={o.color} size={14} /> {o.label}
+                  </>
+                )
+              }
+            />
+          </>
+        )}
+      </Popover>
+      <Popover
+        width={220}
+        trigger={
+          <button className="bulkbar-btn" type="button">
+            <Ic.target size={15} /> Milestone
+          </button>
+        }
+      >
+        {(close) => (
+          <>
+            <div className="pop-label">Set milestone</div>
+            <OptionList
+              options={[{ id: '', label: 'No milestone' }, ...milestones.map((m) => ({ id: m.id, label: m.name }))]}
+              onPick={(id) => {
+                onSetMilestone(id || null);
+                close();
+              }}
+              renderOpt={(o) =>
+                o.id === '' ? (
+                  <>
+                    <Ic.close size={15} /> {o.label}
+                  </>
+                ) : (
+                  <>
+                    <Ic.target size={14} /> {o.label}
+                  </>
+                )
+              }
+            />
+          </>
         )}
       </Popover>
       <button className="bulkbar-btn" type="button" onClick={onMarkDone}>

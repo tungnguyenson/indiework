@@ -17,7 +17,7 @@ interface PopoverProps {
 /** A trigger + portaled, viewport-clamped popover. Closes on outside-click/Esc. */
 export function Popover({ trigger, children, align = 'left', width = 220, className }: PopoverProps) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
   const btnRef = useRef<HTMLSpanElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
 
@@ -26,9 +26,15 @@ export function Popover({ trigger, children, align = 'left', width = 220, classN
     if (!r) return;
     let left = align === 'right' ? r.right - width : r.left;
     left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
-    let top = r.bottom + 6;
-    if (top + 300 > window.innerHeight) top = Math.max(8, r.top - 6 - 300);
-    setPos({ left, top });
+    const gap = 6;
+    // Prefer opening below the trigger; flip above only when there isn't room.
+    if (r.bottom + gap + 300 > window.innerHeight) {
+      // Anchor the popover's BOTTOM edge to the trigger so the gap stays exact
+      // regardless of the popover's height (heights vary by option count).
+      setPos({ left, bottom: window.innerHeight - r.top + gap });
+    } else {
+      setPos({ left, top: r.bottom + gap });
+    }
   }, [align, width]);
 
   useEffect(() => {
@@ -76,7 +82,7 @@ export function Popover({ trigger, children, align = 'left', width = 220, classN
           <div
             ref={popRef}
             className={`popover fade-in ${className ?? ''}`}
-            style={{ left: pos.left, top: pos.top, width }}
+            style={{ left: pos.left, top: pos.top, bottom: pos.bottom, width }}
             onClick={(e) => e.stopPropagation()}
           >
             {typeof children === 'function' ? children(() => setOpen(false)) : children}
