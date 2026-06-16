@@ -1,9 +1,10 @@
 'use client';
 
 import { startTransition, useOptimistic } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import type { TaskDto } from '@/server/services';
 import { applyTaskOptimistic } from '@/lib/optimistic';
+import { useTaskNav, useOpenTaskKey, taskKey } from '@/lib/task-nav';
 import { createTask, toggleTaskDone, assignTaskToProject } from '@/app/_actions/tasks';
 import { QuickCapture } from './quick-capture';
 import { CircleCheck } from '@/components/ui/interactive';
@@ -19,16 +20,10 @@ interface ProjectOpt {
 
 export function InboxScreen({ tasks, projects }: { tasks: TaskDto[]; projects: ProjectOpt[] }) {
   const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
-  const openTaskId = params.get('task');
+  const { openTask } = useTaskNav();
+  const openKey = useOpenTaskKey();
   const [optimisticTasks, applyOptimistic] = useOptimistic(tasks, applyTaskOptimistic);
 
-  const openTask = (id: string) => {
-    const sp = new URLSearchParams(Array.from(params.entries()));
-    sp.set('task', id);
-    router.push(`${pathname}?${sp.toString()}`, { scroll: false });
-  };
   const add = async (title: string) => {
     // Create needs a server-generated id, so it stays non-optimistic (see ADR 0002).
     await createTask({ title });
@@ -71,8 +66,8 @@ export function InboxScreen({ tasks, projects }: { tasks: TaskDto[]; projects: P
               key={t.id}
               className="task-row"
               data-done={t.done ? '' : undefined}
-              data-selected={openTaskId === t.id ? '' : undefined}
-              onClick={() => openTask(t.id)}
+              data-selected={openKey === taskKey(t) ? '' : undefined}
+              onClick={() => openTask(t)}
               style={{ paddingLeft: 12 }}
             >
               <CircleCheck done={t.done} status={t.status} onToggle={() => toggle(t.id)} />

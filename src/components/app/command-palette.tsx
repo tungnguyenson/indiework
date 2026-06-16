@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { loadSearchIndex, type SearchIndex } from '@/app/_actions/queries';
+import { taskPath } from '@/lib/task-nav';
 import { Ic } from '@/components/ui/icons';
 
 type Result =
@@ -42,7 +43,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       .slice(0, 8)
       .map<Result>((t) => {
         const key = t.projectId ? keyOf.get(t.projectId) : null;
-        const href = key ? `/app/p/${key}?task=${t.id}` : `/app/inbox?task=${t.id}`;
+        const href = t.ref ? taskPath(t.ref, t.title) ?? `/app/p/${key}?task=${t.id}` : `/app/inbox?task=${t.id}`;
         return { kind: 'task', id: t.id, title: t.title, sub: key ?? 'Inbox', ref: t.ref, href };
       });
     return [...projects, ...tasks];

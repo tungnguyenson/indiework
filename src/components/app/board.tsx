@@ -1,7 +1,7 @@
 'use client';
 
 import { startTransition, useMemo, useOptimistic, useState } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import type { TaskDto } from '@/server/services';
 import {
   boardBuckets,
@@ -14,6 +14,7 @@ import {
   type FieldVis,
 } from '@/lib/grouping';
 import { applyTaskOptimistic } from '@/lib/optimistic';
+import { useTaskNav } from '@/lib/task-nav';
 import { createTask, updateTask } from '@/app/_actions/tasks';
 import { PriorityBars, ModuleTag, MilestoneTag, ModuleIcon, StatusChip } from '@/components/ui/bits';
 import { Ic } from '@/components/ui/icons';
@@ -40,8 +41,7 @@ export function BoardView({
   cfg: BoardCfg;
 }) {
   const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
+  const { openTask } = useTaskNav();
   const [optimisticTasks, applyOptimistic] = useOptimistic(tasks, applyTaskOptimistic);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overKey, setOverKey] = useState<string | null>(null);
@@ -60,12 +60,6 @@ export function BoardView({
     [optimisticTasks, cfg.hideDone],
   );
   const sortFn = sortBoardCards(cfg.ordering);
-
-  const openTask = (id: string) => {
-    const sp = new URLSearchParams(Array.from(params.entries()));
-    sp.set('task', id);
-    router.push(`${pathname}?${sp.toString()}`, { scroll: false });
-  };
 
   const drop = (e: React.DragEvent, patch: NewTaskPatch) => {
     const id = e.dataTransfer.getData('text/plain') || dragId;
@@ -126,7 +120,7 @@ export function BoardView({
                 setDragId(t.id);
               }}
               onDragEnd={() => setDragId(null)}
-              onOpen={() => openTask(t.id)}
+              onOpen={() => openTask(t)}
             />
           ))}
         </div>

@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import type { TaskDto } from '@/server/services';
 import type { GroupModule, GroupMilestone, FieldVis } from '@/lib/grouping';
+import { taskKey } from '@/lib/task-nav';
 import { CircleCheck } from '@/components/ui/interactive';
 import { PriorityBars, ModuleTag, MilestoneTag, DuePill, StatusChip } from '@/components/ui/bits';
 import { Ic } from '@/components/ui/icons';
@@ -16,9 +18,10 @@ export function TaskRow({
   fields,
   childTasks,
   showSubtasks,
-  openTaskId,
+  openKey,
   onToggleDone,
   onOpen,
+  onRename,
   onToggleSelect,
   showModule = true,
   showMilestone = true,
@@ -32,9 +35,10 @@ export function TaskRow({
   fields: FieldVis;
   childTasks?: TaskDto[];
   showSubtasks?: boolean;
-  openTaskId?: string | null;
+  openKey?: string | null;
   onToggleDone: (id: string) => void;
-  onOpen: (id: string) => void;
+  onOpen: (task: TaskDto) => void;
+  onRename: (id: string, title: string) => void;
   onToggleSelect: (shift: boolean) => void;
   showModule?: boolean;
   showMilestone?: boolean;
@@ -43,6 +47,20 @@ export function TaskRow({
   const subDone = children.filter((c) => c.done).length;
   const hasChildren = children.length > 0;
   const allDone = hasChildren && subDone === children.length;
+
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(task.title);
+
+  const startEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDraft(task.title);
+    setEditing(true);
+  };
+  const commitEdit = () => {
+    const t = draft.trim();
+    setEditing(false);
+    if (t && t !== task.title) onRename(task.id, t);
+  };
 
   return (
     <>
@@ -53,7 +71,8 @@ export function TaskRow({
         data-selected={selected ? '' : undefined}
         data-checked={checked ? '' : undefined}
         data-selmode={selMode ? '' : undefined}
-        onClick={() => onOpen(task.id)}
+        data-editing={editing ? '' : undefined}
+        onClick={() => !editing && onOpen(task)}
       >
         <button
           className="task-select"
@@ -80,7 +99,39 @@ export function TaskRow({
 
         <div className="task-main">
           <div className="task-line">
-            <span className="task-title">{task.title}</span>
+            {editing ? (
+              <input
+                className="task-title-input"
+                autoFocus
+                value={draft}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    commitEdit();
+                  }
+                  if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setEditing(false);
+                  }
+                }}
+                onBlur={commitEdit}
+              />
+            ) : (
+              <>
+                <span className="task-title">{task.title}</span>
+                <button
+                  className="task-title-edit task-reveal"
+                  type="button"
+                  aria-label="Rename task"
+                  title="Rename"
+                  onClick={startEdit}
+                >
+                  <Ic.edit size={12} />
+                </button>
+              </>
+            )}
           </div>
           {task.status === 'pending' && task.statusNote && (
             <div className="task-note-2nd">
@@ -125,8 +176,8 @@ export function TaskRow({
               key={c.id}
               className="subtask-row"
               data-done={c.done ? '' : undefined}
-              data-selected={openTaskId === c.id ? '' : undefined}
-              onClick={() => onOpen(c.id)}
+              data-selected={openKey === taskKey(c) ? '' : undefined}
+              onClick={() => onOpen(c)}
             >
               <button
                 className="subtask-check"

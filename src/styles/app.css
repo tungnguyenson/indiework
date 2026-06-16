@@ -67,6 +67,9 @@
 .ws-switch:hover { background: var(--bg-hover); }
 .ws-brand { width: 30px; height: 30px; border-radius: var(--r-sm); display: grid; place-items: center;
   background: var(--accent); color: #fff; flex: none; }
+/* app brand mark in the switcher trigger — the SVG already carries its own
+   rounded accent tile, so no wrapper background/radius here. */
+.ws-mark { display: block; flex: none; }
 .ws-meta { flex: 1; min-width: 0; }
 .ws-meta b { display: block; font-size: 14px; color: var(--text-strong); font-weight: 640; letter-spacing: -0.01em;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -250,6 +253,13 @@
 .task-title { color: var(--text-strong); font-weight: 550; font-size: 14px; overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; }
 .task-row[data-done] .task-title, .task-row[data-cancelled] .task-title { color: var(--text-faint); text-decoration: line-through; font-weight: 500; }
+/* inline rename (IW-9): hover-revealed pencil swaps the title to an input */
+.task-title-edit { flex: none; padding: 1px; border: none; background: none; color: var(--text-faint);
+  border-radius: var(--r-sm); cursor: pointer; transition: color .12s, background .12s; }
+.task-title-edit:hover { color: var(--text-strong); background: var(--bg-hover-2, var(--bg-hover)); }
+.task-title-input { flex: 1; min-width: 0; border: none; outline: none; color: var(--text-strong);
+  font-weight: 550; font-size: 14px; font-family: inherit; background: var(--bg-hover);
+  border-radius: var(--r-sm); padding: 2px 6px; margin: -2px -6px; box-shadow: 0 0 0 2px var(--accent-ring); }
 .task-ref { font: 500 11.5px/1 var(--font-mono); color: var(--text-faint); flex: none; white-space: nowrap; }
 .task-note-2nd { display: flex; align-items: center; gap: 5px; color: var(--st-pending);
   font-size: 12px; font-weight: 540; min-width: 0; }

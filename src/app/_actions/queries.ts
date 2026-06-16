@@ -10,8 +10,8 @@ import {
   attachmentService,
 } from '@/server/services';
 
-export async function getTaskDetail(id: string) {
-  const task = await taskService.getById(id);
+async function assembleDetail(task: Awaited<ReturnType<typeof taskService.getById>>) {
+  const id = task.id;
   const [comments, modules, milestones, rawChildren, parent, attachments] = await Promise.all([
     commentService.list(id),
     task.projectId ? moduleService.list(task.projectId) : Promise.resolve([]),
@@ -27,6 +27,15 @@ export async function getTaskDetail(id: string) {
   const children = rawChildren.map((c) => ({ ...c, displayRef: c.ref }));
 
   return { task, displayRef, parent, children, comments, modules, milestones, attachments };
+}
+
+export async function getTaskDetail(id: string) {
+  return assembleDetail(await taskService.getById(id));
+}
+
+/** Resolve a detail panel from a public ref ("IW-11") — the path-URL scheme. */
+export async function getTaskDetailByRef(ref: string) {
+  return assembleDetail(await taskService.getByRef(ref));
 }
 export type TaskDetail = Awaited<ReturnType<typeof getTaskDetail>>;
 
