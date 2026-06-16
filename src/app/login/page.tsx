@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { LoginForm } from './login-form';
 
-export const metadata: Metadata = { title: 'Unlock — IndieWork' };
+// Bare word; the root layout's title template renders it as "Unlock · IndieWork".
+export const metadata: Metadata = { title: 'Unlock' };
 
 // Render at request time so the demo flag is read from the container's env
 // (DEMO_MODE), not baked in at build — one image serves both app and demo.

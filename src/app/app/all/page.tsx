@@ -1,8 +1,11 @@
+import type { Metadata } from 'next';
 import { projectService } from '@/server/services';
 import { resolveActiveWorkspace } from '@/server/active-workspace';
 import { AllProjectsScreen } from '@/components/app/all-projects';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = { title: 'All projects' };
 
 export default async function AllProjectsPage() {
   const { active, isDefault } = await resolveActiveWorkspace();
