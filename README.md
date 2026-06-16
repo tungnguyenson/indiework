@@ -20,11 +20,11 @@ all do exactly the same thing.
 - **Status note ≠ comments** — a pinned line answers "where is this right now?"; the timeline logs what you tried.
 - **Slide-in detail panel**, board (kanban), grouped list with multi-select bulk actions, ⌘K command palette.
 - **REST API** (`/api/v1`) and **MCP server** (`/mcp`) over the same service layer.
-- **One password** guards the door — no accounts, no OAuth. Your data lives in your Postgres.
+- **One password** guards the door — no accounts, no OAuth. Your data lives in your own Postgres (or a single SQLite file).
 
 ## Tech stack
 
-Next.js 16 (App Router / RSC) · React 19 · TailwindCSS 4 · Drizzle ORM + PostgreSQL ·
+Next.js 16 (App Router / RSC) · React 19 · TailwindCSS 4 · Drizzle ORM + PostgreSQL **or SQLite** ·
 `@modelcontextprotocol/sdk` · pnpm. Auth is a `.env` password + signed cookie (web) and a
 Bearer token (API/MCP).
 
@@ -48,9 +48,24 @@ runs migrations + seeds a default workspace on boot; Postgres data persists in a
 
 ## Local development
 
-First get a Postgres database — pick **one** of the two options below — then run the app.
+Pick a database backend — **SQLite** needs no server (the whole DB is one file; great
+for trying it out or a local demo), **Postgres** is the production default.
 
-### Database — option A: Docker (recommended)
+### Database — option A: SQLite (no server)
+
+```bash
+pnpm install
+cp .env.example .env              # set APP_PASSWORD, COOKIE_SECRET, API_TOKEN — DATABASE_URL not needed
+pnpm db:push:sqlite               # create the schema in ./data/iw.db
+pnpm db:seed:sample:sqlite        # optional: 4 demo projects + tasks (or `db:seed:sqlite` for just a workspace)
+DB_DRIVER=sqlite pnpm dev         # http://localhost:3000
+```
+
+The whole database is the single file `./data/iw.db` (override with `SQLITE_PATH`); delete
+it to reset. Set `DB_DRIVER=sqlite` on anything that touches the DB — the `*:sqlite` scripts
+already do. Full notes (incl. when to prefer Postgres): **[docs/infra/sqlite.md](docs/infra/sqlite.md)**.
+
+### Database — option B: Postgres via Docker (recommended for production parity)
 
 ```bash
 docker compose -f docker/compose.postgres-container.yml up -d db   # Postgres on localhost:5432
@@ -59,7 +74,7 @@ docker compose -f docker/compose.postgres-container.yml up -d db   # Postgres on
 The container creates the role, password, and database (`indiework` / `indiework` /
 `indiework`) for you. Set the `DATABASE_URL` host to `127.0.0.1:5432` in `.env`.
 
-### Database — option B: standalone Postgres (no Docker)
+### Database — option C: standalone Postgres (no Docker)
 
 If you already run Postgres locally (Homebrew, Postgres.app, apt, …) on the default port
 `5432`, create the role and database once. Connect as a superuser, then:
@@ -79,7 +94,7 @@ no extra `GRANT` (Postgres 15+). Keep the `DATABASE_URL` host at `127.0.0.1:5432
 `.env.example` default) — use `127.0.0.1`, not `localhost`, to dodge an IPv6 stall on
 macOS. You may pick any role/password/db names; just match them in `DATABASE_URL`.
 
-### Then run the app
+### Then run the app (Postgres)
 
 ```bash
 pnpm install
@@ -90,7 +105,8 @@ pnpm db:seed:sample                              # optional demo project + tasks
 pnpm dev                                         # http://localhost:3000
 ```
 
-Scripts: `pnpm typecheck`, `pnpm test` (Vitest), `pnpm db:generate` (new migration from schema), `pnpm db:studio`.
+Scripts: `pnpm typecheck`, `pnpm test` (Vitest), `pnpm db:generate` (new migration from schema),
+`pnpm db:studio`. SQLite equivalents: `db:push:sqlite`, `db:seed:sqlite`, `db:seed:sample:sqlite`, `db:studio:sqlite`.
 
 ## Deploy
 
@@ -100,11 +116,15 @@ Three ways to ship it, documented under [`docs/infra/`](docs/infra/):
 - **[VPS + Docker](docs/infra/deploy-vps.md)** — self-host on your own box (Postgres in a container or on the host).
 - **[CI/CD → VPS](docs/infra/ci-cd.md)** — GitHub Actions builds the image, pushes to GHCR, the VPS just pulls.
 
+Prefer a zero-dependency backend (no Postgres) for a self-host or demo? See **[SQLite](docs/infra/sqlite.md)**.
+
 ## Environment
 
 | Var | Purpose |
 |---|---|
-| `DATABASE_URL` | Postgres connection string |
+| `DB_DRIVER` | `postgres` (default) or `sqlite` — picks the database backend |
+| `DATABASE_URL` | Postgres connection string (required when `DB_DRIVER=postgres`) |
+| `SQLITE_PATH` | SQLite file path when `DB_DRIVER=sqlite` (default `./data/iw.db`) |
 | `APP_PASSWORD` | Web login password (single user) |
 | `COOKIE_SECRET` | Signs the session cookie (≥ 32 chars) |
 | `API_TOKEN` | Bearer token for the REST API + MCP |

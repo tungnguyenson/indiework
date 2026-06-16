@@ -248,7 +248,7 @@ export const taskService = {
       .select({
         task: schema.tasks,
         projectKey: schema.projects.key,
-        attachmentCount: sql<number>`(select count(*)::int from ${schema.attachments} where ${schema.attachments.taskId} = ${schema.tasks.id})`,
+        attachmentCount: sql<number>`(select cast(count(*) as integer) from ${schema.attachments} where ${schema.attachments.taskId} = ${schema.tasks.id})`,
       })
       .from(schema.tasks)
       .leftJoin(schema.projects, eq(schema.tasks.projectId, schema.projects.id))
