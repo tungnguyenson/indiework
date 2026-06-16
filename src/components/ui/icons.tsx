@@ -49,6 +49,8 @@ import {
   Download,
   CornerDownRight,
   Baseline,
+  Archive,
+  ArchiveRestore,
   type LucideProps,
 } from 'lucide-react';
 
@@ -106,6 +108,8 @@ export const Ic = {
   download: make(Download),
   cornerDownRight: make(CornerDownRight),
   type: make(Baseline),
+  archive: make(Archive),
+  restore: make(ArchiveRestore),
 };
 
 export type IconName = keyof typeof Ic;

@@ -405,6 +405,18 @@
 .ov-grid { display: grid; grid-template-columns: 116px 1fr; gap: 11px 18px; align-items: center; }
 .ov-label { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
 .ov-desc-label { display: block; margin: 24px 0 9px; }
+.ov-danger { margin-top: 40px; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 13px 16px; border: 1px solid var(--st-danger-bg); border-radius: var(--r-md); background: var(--st-danger-bg); }
+.ov-danger-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ov-danger-title { font-size: 13.5px; font-weight: 650; color: var(--text-strong); }
+.ov-danger-desc { font-size: 12px; color: var(--text-muted); }
+.ov-danger-btn { display: inline-flex; align-items: center; gap: 6px; flex: none; padding: 7px 12px;
+  font: 600 13px/1 inherit; color: var(--st-danger); background: var(--bg-surface); border: 1px solid var(--st-danger);
+  border-radius: var(--r-sm); cursor: pointer; transition: .12s; }
+.ov-danger-btn:hover { background: var(--st-danger); color: #fff; }
+.ov-danger[data-archived] { border-color: var(--border-soft); background: var(--bg-sunken); }
+.ov-danger-btn[data-restore] { color: var(--text-strong); border-color: var(--border); }
+.ov-danger-btn[data-restore]:hover { background: var(--bg-hover); color: var(--text-strong); }
 .ov-input { width: 100%; border: 1px solid transparent; border-radius: var(--r-sm); padding: 8px 10px;
   font-size: 14px; color: var(--text-strong); background: var(--bg-sunken); outline: none; transition: .12s; font-family: inherit; }
 .ov-input:hover { background: var(--bg-hover); }
@@ -592,7 +604,13 @@
 .pt-desc { color: var(--text); max-width: 300px; }
 .pt-note { color: var(--text-muted); max-width: 280px; font-size: 12.5px; }
 .pt-num { text-align: right; font-weight: 600; color: var(--text-strong); font-variant-numeric: tabular-nums; }
-.pt-tagrow { display: flex; flex-wrap: wrap; gap: 4px; }
+.pt-tagrow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.pt-row[data-archived] .pt-pname { color: var(--text-muted); }
+.pt-row[data-archived] .nav-emoji { opacity: 0.6; }
+.pt-restore { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; padding: 4px 9px;
+  font: 600 12px/1 inherit; color: var(--text-muted); background: var(--bg-surface); border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm); cursor: pointer; transition: .12s; }
+.pt-restore:hover { color: var(--text-strong); background: var(--bg-hover); border-color: var(--border); }
 
 /* solo emoji trigger (forms) */
 .emoji-solo { width: 44px; height: 44px; font-size: 22px; }

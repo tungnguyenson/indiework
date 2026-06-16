@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ShellData } from '@/server/load';
 import { PROJECT_STATUS, PROJECT_STATUS_LABEL, type ProjectStatus } from '@/lib/domain';
+import { unarchiveProject } from '@/app/_actions/projects';
 import { Ic } from '@/components/ui/icons';
 
 type Projects = ShellData['projects'];
@@ -17,25 +18,38 @@ const DOT_KEY: Record<ProjectStatus, string> = {
   cancelled: 'cancelled',
 };
 
+const ARCHIVED_KEY = '__archived';
+
 export function AllProjectsScreen({ projects }: { projects: Projects }) {
   const router = useRouter();
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set([ARCHIVED_KEY]));
 
-  const groups = useMemo(
-    () =>
-      PROJECT_STATUS.map((status) => ({
-        status,
-        items: projects.filter((p) => p.status === status),
-      })).filter((g) => g.items.length > 0),
-    [projects],
-  );
+  // Archive is orthogonal to status — partition it out first so an archived
+  // `active` project doesn't reappear under the "Active" group.
+  const { groups, archived } = useMemo(() => {
+    const live = projects.filter((p) => !p.archivedAt);
+    const archived = projects.filter((p) => p.archivedAt);
+    const groups = PROJECT_STATUS.map((status) => ({
+      status,
+      items: live.filter((p) => p.status === status),
+    })).filter((g) => g.items.length > 0);
+    return { groups, archived };
+  }, [projects]);
 
   const toggle = (s: string) =>
     setCollapsed((prev) => {
       const next = new Set(prev);
-      next.has(s) ? next.delete(s) : next.add(s);
+      if (next.has(s)) next.delete(s);
+      else next.add(s);
       return next;
     });
+
+  const open = (key: string) => router.push(`/app/p/${key}/overview`);
+
+  const restore = async (id: string) => {
+    await unarchiveProject(id);
+    router.refresh();
+  };
 
   return (
     <>
@@ -62,40 +76,39 @@ export function AllProjectsScreen({ projects }: { projects: Projects }) {
               return (
                 <FragmentGroup
                   key={g.status}
-                  status={g.status}
+                  label={PROJECT_STATUS_LABEL[g.status]}
+                  dotKey={DOT_KEY[g.status]}
                   count={g.items.length}
                   collapsed={isCollapsed}
                   onToggle={() => toggle(g.status)}
                 >
                   {!isCollapsed &&
                     g.items.map((p) => (
-                      <tr
-                        key={p.id}
-                        className="pt-row"
-                        onClick={() => router.push(`/app/p/${p.key}/overview`)}
-                      >
-                        <td className="pt-name">
-                          <span className="nav-emoji">{p.emoji ?? '•'}</span>
-                          <span className="pt-pname">{p.name}</span>
-                          <span className="pt-key">{p.key}</span>
-                        </td>
-                        <td className="pt-desc">{p.shortDesc}</td>
-                        <td className="pt-note">{p.statusNote}</td>
-                        <td className="pt-num">{p.issues}</td>
-                        <td>
-                          <div className="pt-tagrow">
-                            {p.tags.map((t) => (
-                              <span className="tagchip sm" key={t}>
-                                {t}
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                      </tr>
+                      <ProjectRow key={p.id} p={p} onOpen={() => open(p.key)} />
                     ))}
                 </FragmentGroup>
               );
             })}
+
+            {archived.length > 0 && (
+              <FragmentGroup
+                label="Archived"
+                dotKey="backlog"
+                count={archived.length}
+                collapsed={collapsed.has(ARCHIVED_KEY)}
+                onToggle={() => toggle(ARCHIVED_KEY)}
+              >
+                {!collapsed.has(ARCHIVED_KEY) &&
+                  archived.map((p) => (
+                    <ProjectRow
+                      key={p.id}
+                      p={p}
+                      onOpen={() => open(p.key)}
+                      onRestore={() => restore(p.id)}
+                    />
+                  ))}
+              </FragmentGroup>
+            )}
           </tbody>
         </table>
       </div>
@@ -103,14 +116,60 @@ export function AllProjectsScreen({ projects }: { projects: Projects }) {
   );
 }
 
+function ProjectRow({
+  p,
+  onOpen,
+  onRestore,
+}: {
+  p: Projects[number];
+  onOpen: () => void;
+  onRestore?: () => void;
+}) {
+  return (
+    <tr className="pt-row" data-archived={onRestore ? '' : undefined} onClick={onOpen}>
+      <td className="pt-name">
+        <span className="nav-emoji">{p.emoji ?? '•'}</span>
+        <span className="pt-pname">{p.name}</span>
+        <span className="pt-key">{p.key}</span>
+      </td>
+      <td className="pt-desc">{p.shortDesc}</td>
+      <td className="pt-note">{p.statusNote}</td>
+      <td className="pt-num">{p.issues}</td>
+      <td>
+        <div className="pt-tagrow">
+          {p.tags.map((t) => (
+            <span className="tagchip sm" key={t}>
+              {t}
+            </span>
+          ))}
+          {onRestore && (
+            <button
+              className="pt-restore"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRestore();
+              }}
+            >
+              <Ic.restore size={13} /> Restore
+            </button>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 function FragmentGroup({
-  status,
+  label,
+  dotKey,
   count,
   collapsed,
   onToggle,
   children,
 }: {
-  status: ProjectStatus;
+  label: string;
+  dotKey: string;
   count: number;
   collapsed: boolean;
   onToggle: () => void;
@@ -123,8 +182,8 @@ function FragmentGroup({
           <span className="pt-groupcaret">
             <Ic.chevronDown size={13} />
           </span>
-          <span className="dot" style={{ background: `var(--st-${DOT_KEY[status]})` }} />
-          {PROJECT_STATUS_LABEL[status]}
+          <span className="dot" style={{ background: `var(--st-${dotKey})` }} />
+          {label}
           <span className="pt-groupcount">{count}</span>
         </td>
       </tr>

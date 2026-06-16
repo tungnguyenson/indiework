@@ -128,4 +128,14 @@ export const projectService = {
     if (!row) throw notFound('project');
     return row;
   },
+
+  async unarchive(id: string) {
+    const [row] = await db
+      .update(schema.projects)
+      .set({ archivedAt: null, updatedAt: new Date() })
+      .where(eq(schema.projects.id, id))
+      .returning();
+    if (!row) throw notFound('project');
+    return row;
+  },
 };

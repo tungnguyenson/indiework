@@ -9,6 +9,7 @@ export default async function AllProjectsPage() {
   const projects = await projectService.list({
     workspaceId: active?.id ?? null,
     includeNullWorkspace: isDefault,
+    includeArchived: true,
   });
   return <AllProjectsScreen projects={projects} />;
 }

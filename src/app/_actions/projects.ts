@@ -30,3 +30,8 @@ export async function archiveProject(id: string) {
   await projectService.archive(id);
   refresh();
 }
+
+export async function unarchiveProject(id: string) {
+  await projectService.unarchive(id);
+  refresh();
+}

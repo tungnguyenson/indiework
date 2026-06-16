@@ -22,7 +22,7 @@ import { fmtDate, toDateInputValue } from '@/lib/dates';
 import { mdToHtml } from '@/lib/markdown';
 import { commitOnEnter } from '@/lib/inline-edit';
 import { PROJECT_COLORS } from '@/lib/colors';
-import { updateProject } from '@/app/_actions/projects';
+import { updateProject, archiveProject, unarchiveProject } from '@/app/_actions/projects';
 import {
   createMilestone,
   updateMilestone,
@@ -67,6 +67,7 @@ interface Project {
   statusNote: string | null;
   description: string | null;
   workspaceId: string | null;
+  archivedAt: Date | string | null;
 }
 
 interface WorkspaceOpt {
@@ -138,6 +139,20 @@ function InfoPanel({ project, workspaces }: { project: Project; workspaces: Work
     router.refresh();
   };
   const currentWs = workspaces.find((w) => w.id === project.workspaceId) ?? null;
+
+  const isArchived = !!project.archivedAt;
+
+  const archive = async () => {
+    if (!confirm(`Archive “${project.name}”? It will be hidden from the sidebar. You can restore it later from All projects.`)) return;
+    await archiveProject(project.id);
+    router.push('/app/all');
+  };
+
+  const restore = async () => {
+    await unarchiveProject(project.id);
+    router.refresh();
+  };
+
   return (
     <>
       <div className="ov-grid">
@@ -227,6 +242,26 @@ function InfoPanel({ project, workspaces }: { project: Project; workspaces: Work
 
       <label className="ov-label ov-desc-label">Description</label>
       <MarkdownField value={project.description ?? ''} onSave={(d) => save({ description: d || null })} />
+
+      <div className="ov-danger" data-archived={isArchived ? '' : undefined}>
+        <div className="ov-danger-text">
+          <span className="ov-danger-title">{isArchived ? 'Restore project' : 'Archive project'}</span>
+          <span className="ov-danger-desc">
+            {isArchived
+              ? 'This project is archived and hidden from the sidebar.'
+              : 'Hide it from the sidebar. You can restore it later from All projects.'}
+          </span>
+        </div>
+        {isArchived ? (
+          <button className="ov-danger-btn" type="button" data-restore="" onClick={restore}>
+            <Ic.restore size={14} /> Restore
+          </button>
+        ) : (
+          <button className="ov-danger-btn" type="button" onClick={archive}>
+            <Ic.archive size={14} /> Archive
+          </button>
+        )}
+      </div>
     </>
   );
 }
