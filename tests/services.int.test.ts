@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { db, schema, pool } from '@/server/db';
+import { db, schema, closeDb } from '@/server/db';
 import {
   projectService,
   taskService,
@@ -25,7 +25,7 @@ async function cleanup() {
 beforeAll(cleanup);
 afterAll(async () => {
   await cleanup();
-  await pool.end();
+  await closeDb();
 });
 
 describe('service slice (real Postgres)', () => {

@@ -1,9 +1,25 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { ServiceError, workspaceService } from '@/server/services';
+import { ServiceError, workspaceService, projectService } from '@/server/services';
 import { loadProject } from '@/server/load';
 import { OverviewScreen } from '@/components/app/overview';
 
 export const dynamic = 'force-dynamic';
+
+// Tab title tracks the project being viewed; falls back to the layout default.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ projectKey: string }>;
+}): Promise<Metadata> {
+  const { projectKey } = await params;
+  try {
+    const project = await projectService.getByKey(projectKey);
+    return { title: project.name };
+  } catch {
+    return {};
+  }
+}
 
 export default async function ProjectOverviewPage({
   params,

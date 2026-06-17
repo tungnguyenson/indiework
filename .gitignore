@@ -20,6 +20,13 @@
 # production
 /build
 
+# sqlite (DB_DRIVER=sqlite) — local/demo database files are throwaway
+/data
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+
 # misc
 .DS_Store
 *.pem

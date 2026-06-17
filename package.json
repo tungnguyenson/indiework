@@ -13,10 +13,15 @@
     "db:seed": "node --env-file=.env --import tsx src/server/db/seed.ts",
     "db:seed:sample": "node --env-file=.env --import tsx src/server/db/seed-sample.ts",
     "db:studio": "node --env-file=.env node_modules/drizzle-kit/bin.cjs studio",
+    "db:push:sqlite": "drizzle-kit push --config=drizzle.sqlite.config.ts",
+    "db:seed:sqlite": "DB_DRIVER=sqlite node --env-file=.env --import tsx src/server/db/seed.ts",
+    "db:seed:sample:sqlite": "DB_DRIVER=sqlite node --env-file=.env --import tsx src/server/db/seed-sample.ts",
+    "db:studio:sqlite": "node node_modules/drizzle-kit/bin.cjs studio --config=drizzle.sqlite.config.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@libsql/client": "^0.17.3",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@tiptap/core": "^3.27.0",
     "@tiptap/extensions": "^3.27.0",

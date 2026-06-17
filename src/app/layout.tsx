@@ -42,7 +42,13 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'IndieWork — calm project management for solo devs',
+  // `default` is the bare tagline for pages that set no title of their own
+  // (landing, login fallback). `template` wraps any page that sets a `title`
+  // (project name, Inbox, …) so the tab reads e.g. "IndieWorker · IndieWork".
+  title: {
+    default: 'IndieWork — calm project management for solo devs',
+    template: '%s · IndieWork',
+  },
   description:
     'A single-user, self-hostable project manager for solo indie developers. Module ⟂ Milestone, Inbox capture, and a service layer behind Web, REST, and MCP.',
   metadataBase: new URL('https://indiework.space'),

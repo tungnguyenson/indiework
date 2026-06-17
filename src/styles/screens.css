@@ -120,20 +120,21 @@
 .act-item:last-of-type { border-bottom: none; }
 .act-day { font: 500 11.5px/1.4 var(--font-mono); color: var(--text-faint); flex: none; width: 38px; padding-top: 1px; }
 .act-body { flex: 1; min-width: 0; }
-.act-text { font-size: 13.5px; line-height: 1.55; color: var(--text); }
+.act-text { font-size: 13.5px; line-height: 1.55; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
 .act-src { font-size: 10px; font-weight: 680; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 6px;
   border-radius: var(--r-pill); margin-left: 7px; vertical-align: middle; }
 .act-src[data-src="web"] { color: var(--text-muted); background: var(--bg-active); }
 .act-src[data-src="api"] { color: var(--st-todo); background: var(--st-todo-bg); }
 .act-src[data-src="agent"] { color: var(--st-inbox); background: var(--st-inbox-bg); }
-.comment-box { display: flex; align-items: flex-end; gap: 9px; margin-top: 14px; border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: 10px 12px; background: var(--bg-surface); transition: .14s; }
+.comment-box { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin-top: 14px;
+  border: 1px solid var(--border); border-radius: var(--r-md); padding: 11px 13px; background: var(--bg-surface); transition: .14s; }
 .comment-box:focus-within { border-color: var(--accent-ring); box-shadow: 0 0 0 3px var(--accent-softer); }
-.comment-box textarea { flex: 1; border: none; background: none; outline: none; resize: none; font-family: inherit;
-  font-size: 13.5px; line-height: 1.5; color: var(--text-strong); max-height: 120px; }
-.comment-send { border: none; background: var(--accent); color: #fff; width: 30px; height: 30px; border-radius: var(--r-sm);
+.comment-box textarea { width: 100%; border: none; background: none; outline: none; resize: none; font-family: inherit;
+  font-size: 13.5px; line-height: 1.55; color: var(--text-strong); min-height: 44px; max-height: 220px; overflow-y: auto; }
+.comment-foot { display: flex; align-items: center; justify-content: flex-end; }
+.comment-send { border: none; background: var(--accent); color: #fff; width: 30px; height: 30px; border-radius: 50%;
   display: grid; place-items: center; flex: none; transition: .12s; }
-.comment-send:hover { background: var(--accent-strong); }
+.comment-send:hover:not(:disabled) { background: var(--accent-strong); }
 .comment-send:disabled { background: var(--bg-active); color: var(--text-faint); }
 
 .dp-foot { display: flex; align-items: center; padding: 12px 22px; border-top: 1px solid var(--border-soft); }
