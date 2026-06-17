@@ -13,7 +13,7 @@ import {
   type TaskStatus,
   type TaskPriority,
 } from '@/lib/domain';
-import type { GroupDim, GroupStyle, Filters, FieldVis, BoardCfg, BoardOrdering } from '@/lib/grouping';
+import type { GroupDim, GroupStyle, Filters, FieldVis, BoardCfg, BoardOrdering, GroupModule, GroupMilestone } from '@/lib/grouping';
 import type { ViewMode } from '@/lib/views';
 
 const DIM_LABEL: Record<GroupDim, string> = {
@@ -347,8 +347,21 @@ export function BoardDisplayPopover({
   );
 }
 
-export function FilterPopover({ filters, setFilters }: { filters: Filters; setFilters: (f: Filters) => void }) {
-  const activeCount = filters.status.length + filters.priority.length;
+export function FilterPopover({
+  filters,
+  setFilters,
+  modules,
+  milestones,
+}: {
+  filters: Filters;
+  setFilters: (f: Filters) => void;
+  modules: GroupModule[];
+  milestones: GroupMilestone[];
+}) {
+  // `?? []` guards stale localStorage written before these fields existed.
+  const moduleSel = filters.moduleId ?? [];
+  const milestoneSel = filters.milestoneId ?? [];
+  const activeCount = filters.status.length + filters.priority.length + moduleSel.length + milestoneSel.length;
   const toggleStatus = (s: TaskStatus) =>
     setFilters({
       ...filters,
@@ -358,6 +371,16 @@ export function FilterPopover({ filters, setFilters }: { filters: Filters; setFi
     setFilters({
       ...filters,
       priority: filters.priority.includes(p) ? filters.priority.filter((x) => x !== p) : [...filters.priority, p],
+    });
+  const toggleModule = (id: string) =>
+    setFilters({
+      ...filters,
+      moduleId: moduleSel.includes(id) ? moduleSel.filter((x) => x !== id) : [...moduleSel, id],
+    });
+  const toggleMilestone = (id: string) =>
+    setFilters({
+      ...filters,
+      milestoneId: milestoneSel.includes(id) ? milestoneSel.filter((x) => x !== id) : [...milestoneSel, id],
     });
 
   return (
@@ -394,8 +417,42 @@ export function FilterPopover({ filters, setFilters }: { filters: Filters; setFi
             ))}
           </div>
         </div>
+        {modules.length > 0 && (
+          <div className="dp-block">
+            <div className="dp-label">Module</div>
+            <div className="chip-pick">
+              {modules.map((m) => (
+                <button key={m.id} className="fchip" data-on={moduleSel.includes(m.id) ? '' : undefined} onClick={() => toggleModule(m.id)} type="button">
+                  <ModuleIcon icon={m.icon} color={m.color} size={13} />
+                  {m.name}
+                </button>
+              ))}
+              <button className="fchip" data-on={moduleSel.includes('') ? '' : undefined} onClick={() => toggleModule('')} type="button">
+                <span className="dot" style={{ background: 'var(--text-faint)' }} />
+                No module
+              </button>
+            </div>
+          </div>
+        )}
+        {milestones.length > 0 && (
+          <div className="dp-block">
+            <div className="dp-label">Milestone</div>
+            <div className="chip-pick">
+              {milestones.map((m) => (
+                <button key={m.id} className="fchip" data-on={milestoneSel.includes(m.id) ? '' : undefined} onClick={() => toggleMilestone(m.id)} type="button">
+                  <Ic.target size={13} />
+                  {m.name}
+                </button>
+              ))}
+              <button className="fchip" data-on={milestoneSel.includes('') ? '' : undefined} onClick={() => toggleMilestone('')} type="button">
+                <span className="dot" style={{ background: 'var(--text-faint)' }} />
+                No milestone
+              </button>
+            </div>
+          </div>
+        )}
         {activeCount > 0 && (
-          <button className="dp-reset" type="button" onClick={() => setFilters({ ...filters, status: [], priority: [] })}>
+          <button className="dp-reset" type="button" onClick={() => setFilters({ ...filters, status: [], priority: [], moduleId: [], milestoneId: [] })}>
             Clear filters
           </button>
         )}

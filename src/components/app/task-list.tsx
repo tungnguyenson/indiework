@@ -231,7 +231,12 @@ export function ProjectView({
         modeFor={views.modeFor}
         right={
           <>
-            <FilterPopover filters={filters} setFilters={(f) => setDisp((s) => ({ ...s, filters: f }))} />
+            <FilterPopover
+              filters={filters}
+              setFilters={(f) => setDisp((s) => ({ ...s, filters: f }))}
+              modules={modules}
+              milestones={milestones}
+            />
             {mode === 'board' ? (
               <BoardDisplayPopover
                 setMode={(m) => views.setMode(activeView, m)}
@@ -298,7 +303,11 @@ export function ProjectView({
               <div className="empty-emoji">🍃</div>
               <h3>Nothing here yet</h3>
               <p>
-                {filters.status.length || filters.priority.length || filters.hideDone
+                {filters.status.length ||
+                filters.priority.length ||
+                (filters.moduleId?.length ?? 0) ||
+                (filters.milestoneId?.length ?? 0) ||
+                filters.hideDone
                   ? 'No tasks match the current filters.'
                   : 'Add your first task in the box above, or press c anywhere.'}
               </p>

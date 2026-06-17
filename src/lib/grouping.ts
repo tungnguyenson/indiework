@@ -56,6 +56,10 @@ export const DEFAULT_FIELDS: FieldVis = {
 export interface Filters {
   status: TaskStatus[];
   priority: TaskPriority[];
+  /** Module ids to keep; `''` matches tasks with no module. Empty = no filter. */
+  moduleId: string[];
+  /** Milestone ids to keep; `''` matches tasks with no milestone. Empty = no filter. */
+  milestoneId: string[];
   hideDone: boolean;
   showSubtasks: boolean;
   fields: FieldVis;
@@ -64,6 +68,8 @@ export interface Filters {
 export const DEFAULT_FILTERS: Filters = {
   status: [],
   priority: [],
+  moduleId: [],
+  milestoneId: [],
   hideDone: false,
   showSubtasks: false,
   fields: DEFAULT_FIELDS,
@@ -216,10 +222,15 @@ export function buildSections(
   milestones: GroupMilestone[],
   opts: GroupOpts = {},
 ): Section[] {
+  // Guard against stale localStorage written before these fields existed.
+  const moduleSel = filters.moduleId ?? [];
+  const milestoneSel = filters.milestoneId ?? [];
   const pass = (t: TaskDto) => {
     if (opts.allowedStatus && !opts.allowedStatus(t.status)) return false;
     if (filters.status.length && !filters.status.includes(t.status)) return false;
     if (filters.priority.length && !filters.priority.includes(t.priority)) return false;
+    if (moduleSel.length && !moduleSel.includes(t.moduleId ?? '')) return false;
+    if (milestoneSel.length && !milestoneSel.includes(t.milestoneId ?? '')) return false;
     if (filters.hideDone && (t.done || t.status === 'cancelled')) return false;
     return true;
   };
