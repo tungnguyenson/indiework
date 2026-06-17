@@ -362,6 +362,9 @@ export function FilterPopover({
   const moduleSel = filters.moduleId ?? [];
   const milestoneSel = filters.milestoneId ?? [];
   const activeCount = filters.status.length + filters.priority.length + moduleSel.length + milestoneSel.length;
+  // Module/milestone names run long, so they live in collapsible dropdowns
+  // (full-width rows) rather than wrapping chips. One open at a time.
+  const [openSec, setOpenSec] = useState<'module' | 'milestone' | null>(null);
   const toggleStatus = (s: TaskStatus) =>
     setFilters({
       ...filters,
@@ -419,36 +422,52 @@ export function FilterPopover({
         </div>
         {modules.length > 0 && (
           <div className="dp-block">
-            <div className="dp-label">Module</div>
-            <div className="chip-pick">
-              {modules.map((m) => (
-                <button key={m.id} className="fchip" data-on={moduleSel.includes(m.id) ? '' : undefined} onClick={() => toggleModule(m.id)} type="button">
-                  <ModuleIcon icon={m.icon} color={m.color} size={13} />
-                  {m.name}
+            <button className="dp-acc" data-open={openSec === 'module' ? '' : undefined} type="button" onClick={() => setOpenSec((s) => (s === 'module' ? null : 'module'))}>
+              <span className="dp-acc-lbl">Module</span>
+              {moduleSel.length > 0 && <span className="dp-acc-count">{moduleSel.length}</span>}
+              <Ic.chevronRight size={14} className="dp-acc-chev" />
+            </button>
+            {openSec === 'module' && (
+              <div className="dp-acc-list">
+                {modules.map((m) => (
+                  <button key={m.id} className="opt" data-active={moduleSel.includes(m.id) ? '' : undefined} onClick={() => toggleModule(m.id)} type="button">
+                    <ModuleIcon icon={m.icon} color={m.color} size={14} />
+                    <span className="dp-acc-name">{m.name}</span>
+                    {moduleSel.includes(m.id) && <Ic.check size={15} strokeWidth={2.4} style={{ marginLeft: 'auto', color: 'var(--accent-ink)' }} />}
+                  </button>
+                ))}
+                <button className="opt" data-active={moduleSel.includes('') ? '' : undefined} onClick={() => toggleModule('')} type="button">
+                  <span className="dot" style={{ background: 'var(--text-faint)' }} />
+                  <span className="dp-acc-name">No module</span>
+                  {moduleSel.includes('') && <Ic.check size={15} strokeWidth={2.4} style={{ marginLeft: 'auto', color: 'var(--accent-ink)' }} />}
                 </button>
-              ))}
-              <button className="fchip" data-on={moduleSel.includes('') ? '' : undefined} onClick={() => toggleModule('')} type="button">
-                <span className="dot" style={{ background: 'var(--text-faint)' }} />
-                No module
-              </button>
-            </div>
+              </div>
+            )}
           </div>
         )}
         {milestones.length > 0 && (
           <div className="dp-block">
-            <div className="dp-label">Milestone</div>
-            <div className="chip-pick">
-              {milestones.map((m) => (
-                <button key={m.id} className="fchip" data-on={milestoneSel.includes(m.id) ? '' : undefined} onClick={() => toggleMilestone(m.id)} type="button">
-                  <Ic.target size={13} />
-                  {m.name}
+            <button className="dp-acc" data-open={openSec === 'milestone' ? '' : undefined} type="button" onClick={() => setOpenSec((s) => (s === 'milestone' ? null : 'milestone'))}>
+              <span className="dp-acc-lbl">Milestone</span>
+              {milestoneSel.length > 0 && <span className="dp-acc-count">{milestoneSel.length}</span>}
+              <Ic.chevronRight size={14} className="dp-acc-chev" />
+            </button>
+            {openSec === 'milestone' && (
+              <div className="dp-acc-list">
+                {milestones.map((m) => (
+                  <button key={m.id} className="opt" data-active={milestoneSel.includes(m.id) ? '' : undefined} onClick={() => toggleMilestone(m.id)} type="button">
+                    <Ic.target size={14} />
+                    <span className="dp-acc-name">{m.name}</span>
+                    {milestoneSel.includes(m.id) && <Ic.check size={15} strokeWidth={2.4} style={{ marginLeft: 'auto', color: 'var(--accent-ink)' }} />}
+                  </button>
+                ))}
+                <button className="opt" data-active={milestoneSel.includes('') ? '' : undefined} onClick={() => toggleMilestone('')} type="button">
+                  <span className="dot" style={{ background: 'var(--text-faint)' }} />
+                  <span className="dp-acc-name">No milestone</span>
+                  {milestoneSel.includes('') && <Ic.check size={15} strokeWidth={2.4} style={{ marginLeft: 'auto', color: 'var(--accent-ink)' }} />}
                 </button>
-              ))}
-              <button className="fchip" data-on={milestoneSel.includes('') ? '' : undefined} onClick={() => toggleMilestone('')} type="button">
-                <span className="dot" style={{ background: 'var(--text-faint)' }} />
-                No milestone
-              </button>
-            </div>
+              </div>
+            )}
           </div>
         )}
         {activeCount > 0 && (

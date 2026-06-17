@@ -19,7 +19,7 @@ import {
   type ModuleIcon as ModuleIconName,
 } from '@/lib/domain';
 import { fmtDate, toDateInputValue } from '@/lib/dates';
-import { mdToHtml } from '@/lib/markdown';
+import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import { commitOnEnter } from '@/lib/inline-edit';
 import { PROJECT_COLORS } from '@/lib/colors';
 import { updateProject, archiveProject, unarchiveProject } from '@/app/_actions/projects';
@@ -705,29 +705,12 @@ function TagEditor({ tags, onChange }: { tags: string[]; onChange: (tags: string
 }
 
 function MarkdownField({ value, onSave }: { value: string; onSave: (v: string) => void }) {
-  const [tab, setTab] = useState<'write' | 'preview'>('write');
-  const [v, setV] = useState(value);
   return (
-    <div className="md-field">
-      <div className="md-tabs">
-        <button type="button" data-active={tab === 'write' ? '' : undefined} onClick={() => setTab('write')}>
-          Write
-        </button>
-        <button type="button" data-active={tab === 'preview' ? '' : undefined} onClick={() => setTab('preview')}>
-          Preview
-        </button>
-      </div>
-      {tab === 'write' ? (
-        <textarea
-          className="md-input"
-          value={v}
-          onChange={(e) => setV(e.target.value)}
-          onBlur={() => v !== value && onSave(v)}
-          placeholder={'## What it is\nDescribe the project in markdown…'}
-        />
-      ) : (
-        <div className="md-render" dangerouslySetInnerHTML={{ __html: mdToHtml(v) }} />
-      )}
-    </div>
+    <MarkdownEditor
+      value={value}
+      onSave={onSave}
+      className="md-wysiwyg--lg"
+      placeholder="Describe the project in markdown…"
+    />
   );
 }

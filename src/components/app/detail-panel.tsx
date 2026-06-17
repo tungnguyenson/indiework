@@ -24,8 +24,8 @@ import {
   type TaskPriority,
 } from '@/lib/domain';
 import { fmtDate, fmtDay, toDateInputValue } from '@/lib/dates';
-import { mdToHtml } from '@/lib/markdown';
 import { commitOnEnter } from '@/lib/inline-edit';
+import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import type { UpdateTaskInput } from '@/server/validators/task';
 import { useTaskNav } from '@/lib/task-nav';
 import { Popover, OptionList } from '@/components/ui/popover';
@@ -334,7 +334,12 @@ export function DetailPanel({
         </div>
 
         <p className="dp-section-label">Description</p>
-        <DescriptionEditor key={`desc-${task.id}`} value={task.description ?? ''} onSave={(d) => patch({ description: d })} />
+        <MarkdownEditor
+          key={`desc-${task.id}`}
+          value={task.description ?? ''}
+          onSave={(d) => patch({ description: d })}
+          placeholder="Add a description…"
+        />
 
         {!task.parentId && (
           <div className="dp-subtasks">
@@ -489,40 +494,6 @@ function StatusNote({
           if (!v.trim() && !pending) setOpen(false);
         }}
       />
-    </div>
-  );
-}
-
-function DescriptionEditor({ value, onSave }: { value: string; onSave: (v: string) => void }) {
-  const [editing, setEditing] = useState(false);
-  const [v, setV] = useState(value);
-  if (editing) {
-    return (
-      <div className="dp-desc">
-        <textarea
-          autoFocus
-          value={v}
-          onChange={(e) => setV(e.target.value)}
-          onBlur={() => {
-            setEditing(false);
-            if (v !== value) onSave(v);
-          }}
-          placeholder="Add a description… (markdown)"
-        />
-      </div>
-    );
-  }
-  return (
-    <div
-      className="dp-desc md-render"
-      data-empty={value ? undefined : ''}
-      onClick={() => setEditing(true)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && setEditing(true)}
-      {...(value ? { dangerouslySetInnerHTML: { __html: mdToHtml(value) } } : {})}
-    >
-      {value ? null : 'Add a description…'}
     </div>
   );
 }
