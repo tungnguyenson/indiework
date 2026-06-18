@@ -3,6 +3,7 @@
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { workspaceService } from '@/server/services';
+import { requireSession } from '@/server/auth/require-session';
 import { WORKSPACE_COOKIE } from '@/server/active-workspace';
 import type { CreateWorkspaceInput, UpdateWorkspaceInput } from '@/server/validators/workspace';
 
@@ -23,11 +24,13 @@ async function setWorkspaceCookie(id: string) {
 
 /** Persist which workspace is active (cookie) and re-render the app shell. */
 export async function setActiveWorkspace(id: string) {
+  await requireSession();
   await setWorkspaceCookie(id);
   refresh();
 }
 
 export async function createWorkspace(input: CreateWorkspaceInput) {
+  await requireSession();
   const ws = await workspaceService.create(input);
   // Drop the user straight into the new workspace so the switch is visible.
   await setWorkspaceCookie(ws.id);
@@ -36,6 +39,7 @@ export async function createWorkspace(input: CreateWorkspaceInput) {
 }
 
 export async function updateWorkspace(id: string, patch: UpdateWorkspaceInput) {
+  await requireSession();
   const ws = await workspaceService.update(id, patch);
   refresh();
   return ws;

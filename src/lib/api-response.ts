@@ -20,7 +20,14 @@ export function handleServiceError(e: unknown): Response {
     return fail(msg, 400);
   }
   if (e instanceof ServiceError) {
-    const status = e.code === 'not_found' ? 404 : e.code === 'conflict' ? 409 : 400;
+    const status =
+      e.code === 'not_found'
+        ? 404
+        : e.code === 'conflict'
+          ? 409
+          : e.code === 'unauthorized'
+            ? 401
+            : 400;
     return fail(e.message, status);
   }
   if (e instanceof SyntaxError) return fail('Invalid JSON body', 400);
