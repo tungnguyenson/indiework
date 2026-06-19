@@ -53,6 +53,7 @@ import {
   Archive,
   ArchiveRestore,
   Maximize2,
+  LogOut,
   type LucideProps,
 } from 'lucide-react';
 
@@ -114,6 +115,7 @@ export const Ic = {
   archive: make(Archive),
   restore: make(ArchiveRestore),
   maximize: make(Maximize2),
+  logout: make(LogOut),
 };
 
 export type IconName = keyof typeof Ic;

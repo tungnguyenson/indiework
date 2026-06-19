@@ -110,6 +110,7 @@
 
 /* footer */
 .sb-foot { margin-top: auto; padding-top: 8px; }
+.sb-footform { display: contents; }
 .sb-footbtn { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 9px; border: none; background: none;
   border-radius: var(--r-sm); color: var(--text-muted); font-size: 13px; font-weight: 540; transition: .12s; }
 .sb-footbtn svg { color: var(--text-faint); }
