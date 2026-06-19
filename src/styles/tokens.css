@@ -94,6 +94,7 @@
 
 /* ===================== STATUS palette ===================== */
 /* 8 states (v3): In review = violet, Pending = amber; Done/Cancelled cooled.
+   --st-launching (fuchsia) is a project-lifecycle status only, not a task state.
    --st-danger is a destructive-action red, NOT a status. Legacy --st-blocked
    is kept as an alias of --st-danger so older rules don't break. */
 :root {
@@ -105,6 +106,8 @@
   --st-todo-bg:     oklch(0.95 0.03 245);
   --st-in_progress: oklch(0.58 0.12 215);
   --st-in_progress-bg: oklch(0.95 0.035 215);
+  --st-launching:   oklch(0.58 0.18 330);
+  --st-launching-bg: oklch(0.95 0.05 330);
   --st-in_review:   oklch(0.56 0.14 305);
   --st-in_review-bg: oklch(0.95 0.04 305);
   --st-pending:     oklch(0.64 0.13 73);
@@ -129,6 +132,8 @@
   --st-todo:        oklch(0.82 0.08 245);
   --st-in_progress-bg: oklch(0.34 0.07 215);
   --st-in_progress: oklch(0.83 0.09 215);
+  --st-launching-bg: oklch(0.35 0.08 330);
+  --st-launching:   oklch(0.82 0.11 330);
   --st-in_review-bg: oklch(0.35 0.07 305);
   --st-in_review:   oklch(0.82 0.10 305);
   --st-pending-bg:  oklch(0.37 0.06 75);

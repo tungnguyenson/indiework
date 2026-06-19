@@ -29,6 +29,7 @@ export const MODULE_STATE = ['planned', 'active', 'done', 'archived'] as const;
 /** Lifecycle of a whole project (drives the sidebar grouping). */
 export const PROJECT_STATUS = [
   'active',
+  'launching',
   'planned',
   'paused',
   'done',
@@ -164,6 +165,7 @@ export const MODULE_STATE_COLOR_KEY: Record<ModuleState, TaskStatus> = {
 /** Project lifecycle status → display label + the sidebar group it sorts into. */
 export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
   active: 'In progress',
+  launching: 'Launching',
   planned: 'Planned',
   paused: 'Paused',
   done: 'Completed',

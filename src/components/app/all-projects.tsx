@@ -12,6 +12,7 @@ type Projects = ShellData['projects'];
 
 const DOT_KEY: Record<ProjectStatus, string> = {
   active: 'in_progress',
+  launching: 'launching',
   planned: 'todo',
   paused: 'blocked',
   done: 'done',

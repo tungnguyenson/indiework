@@ -237,6 +237,7 @@ function buildGroups(projects: Projects): Group[] {
   // map project lifecycle status → the status palette key used for the dot.
   const dotKey: Record<ProjectStatus, string> = {
     active: 'in_progress',
+    launching: 'launching',
     planned: 'todo',
     paused: 'blocked',
     done: 'done',

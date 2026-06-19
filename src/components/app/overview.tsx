@@ -40,6 +40,7 @@ import { Ic } from '@/components/ui/icons';
 
 const DOT_KEY: Record<ProjectStatus, string> = {
   active: 'in_progress',
+  launching: 'launching',
   planned: 'todo',
   paused: 'pending',
   done: 'done',
