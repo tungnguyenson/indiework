@@ -326,7 +326,7 @@ const TOOLS: Tool[] = [
       properties: {
         key: str(),
         name: str(),
-        emoji: str(),
+        emoji: { ...str(), description: 'An emoji glyph (e.g. "🚀") or a Lucide icon name (e.g. "rocket").' },
         color: str(),
         status: { type: 'string', enum: [...PROJECT_STATUS] },
         pinned: { type: 'boolean' },
@@ -462,7 +462,10 @@ const TOOLS: Tool[] = [
         project: str(),
         name: str(),
         color: str(),
-        icon: { type: 'string', enum: [...MODULE_ICONS] },
+        icon: {
+          type: 'string',
+          description: `An emoji glyph (e.g. "📦") or a Lucide icon name. Suggested: ${MODULE_ICONS.join(', ')}.`,
+        },
         state: { type: 'string', enum: [...MODULE_STATE] },
         description: str(),
         position: { type: 'integer' },

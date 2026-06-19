@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { EmojiPicker } from '@/components/ui/emoji-picker';
+import { IconPicker } from '@/components/ui/icon-picker';
 import { Ic } from '@/components/ui/icons';
 import { updateProject } from '@/app/_actions/projects';
 import { commitOnEnter } from '@/lib/inline-edit';
@@ -19,6 +19,7 @@ interface ProjectLite {
   key: string;
   name: string;
   emoji: string | null;
+  color: string | null;
   pinned: boolean;
 }
 
@@ -50,7 +51,7 @@ export function ProjectTabs({
   const [name, setName] = useState(project.name);
   const base = `/app/p/${project.key}`;
 
-  const save = async (patch: { name?: string; emoji?: string; pinned?: boolean }) => {
+  const save = async (patch: { name?: string; emoji?: string; color?: string; pinned?: boolean }) => {
     await updateProject(project.id, patch);
     router.refresh();
   };
@@ -61,7 +62,18 @@ export function ProjectTabs({
   return (
     <div className="tabs">
       <div className="tabs-lead">
-        <EmojiPicker value={project.emoji ?? '🚀'} onPick={(e) => save({ emoji: e })} triggerClass="tabs-lead-emoji" />
+        <IconPicker
+          value={project.emoji ?? '🚀'}
+          color={project.color}
+          onPick={(p) =>
+            save({
+              ...(p.value !== undefined ? { emoji: p.value } : {}),
+              ...(p.color !== undefined ? { color: p.color } : {}),
+            })
+          }
+          triggerClass="tabs-lead-emoji"
+          triggerSize={19}
+        />
         <input
           className="tabs-lead-name"
           value={name}

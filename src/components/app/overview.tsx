@@ -12,16 +12,13 @@ import {
   MODULE_STATE,
   MODULE_STATE_LABEL,
   MODULE_STATE_COLOR_KEY,
-  MODULE_ICONS,
   type ProjectStatus,
   type MilestoneStatus,
   type ModuleState,
-  type ModuleIcon as ModuleIconName,
 } from '@/lib/domain';
 import { fmtDate, toDateInputValue } from '@/lib/dates';
 import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import { commitOnEnter } from '@/lib/inline-edit';
-import { PROJECT_COLORS } from '@/lib/colors';
 import { updateProject, archiveProject, unarchiveProject } from '@/app/_actions/projects';
 import {
   createMilestone,
@@ -36,9 +33,10 @@ import {
 } from '@/app/_actions/structure';
 import { ProjectTabs } from './project-tabs';
 import { useViews } from '@/lib/views';
-import { Progress, ModuleIcon } from '@/components/ui/bits';
+import { Progress } from '@/components/ui/bits';
+import { IconPicker } from '@/components/ui/icon-picker';
 import { Popover, OptionList } from '@/components/ui/popover';
-import { Ic, iconByName } from '@/components/ui/icons';
+import { Ic } from '@/components/ui/icons';
 
 const DOT_KEY: Record<ProjectStatus, string> = {
   active: 'in_progress',
@@ -60,6 +58,7 @@ interface Project {
   key: string;
   name: string;
   emoji: string | null;
+  color: string | null;
   pinned: boolean;
   status: ProjectStatus;
   tags: string[];
@@ -409,13 +408,18 @@ function ModulesPanel({
               >
                 <Ic.grip size={14} />
               </span>
-              <IconColorPicker
-                icon={m.icon}
+              <IconPicker
+                value={m.icon}
                 color={m.color}
-                onPick={async (patch) => {
-                  await updateModule(m.id, patch);
+                onPick={async (p) => {
+                  await updateModule(m.id, {
+                    ...(p.value !== undefined ? { icon: p.value } : {}),
+                    ...(p.color !== undefined ? { color: p.color } : {}),
+                  });
                   router.refresh();
                 }}
+                triggerClass="ov-modicon"
+                triggerSize={16}
               />
               <input
                 className="ov-rowname"
@@ -519,66 +523,6 @@ function StatePicker({ value, options, onPick }: { value: string; options: State
             );
           }}
         />
-      )}
-    </Popover>
-  );
-}
-
-function IconColorPicker({
-  icon,
-  color,
-  onPick,
-}: {
-  icon?: string | null;
-  color?: string | null;
-  onPick: (patch: { icon?: ModuleIconName; color?: string }) => void;
-}) {
-  return (
-    <Popover
-      width={250}
-      trigger={
-        <button className="ov-modicon" type="button" aria-label="Module icon and colour">
-          <ModuleIcon icon={icon ?? 'cube'} color={color} size={16} />
-        </button>
-      }
-    >
-      {(close) => (
-        <div className="modicon-pop">
-          <div className="modicon-colors">
-            {PROJECT_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                className="color-pick"
-                data-on={c === color ? '' : undefined}
-                style={{ background: c, color: c }}
-                onClick={() => onPick({ color: c })}
-                aria-label={`Colour ${c}`}
-              />
-            ))}
-          </div>
-          <div className="modicon-grid">
-            {MODULE_ICONS.map((name) => {
-              const IconC = iconByName(name);
-              return (
-                <button
-                  key={name}
-                  type="button"
-                  className="modicon-cell"
-                  data-on={name === icon ? '' : undefined}
-                  style={name === icon ? { color: color ?? undefined } : undefined}
-                  onClick={() => {
-                    onPick({ icon: name });
-                    close();
-                  }}
-                  aria-label={name}
-                >
-                  <IconC size={16} />
-                </button>
-              );
-            })}
-          </div>
-        </div>
       )}
     </Popover>
   );

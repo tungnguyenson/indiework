@@ -10,12 +10,14 @@ import { QuickCapture } from './quick-capture';
 import { CircleCheck } from '@/components/ui/interactive';
 import { Popover, OptionList } from '@/components/ui/popover';
 import { Ic } from '@/components/ui/icons';
+import { EntityIcon } from '@/components/ui/bits';
 
 interface ProjectOpt {
   id: string;
   key: string;
   name: string;
   emoji: string | null;
+  color: string | null;
 }
 
 export function InboxScreen({ tasks, projects }: { tasks: TaskDto[]; projects: ProjectOpt[] }) {
@@ -100,7 +102,7 @@ export function InboxScreen({ tasks, projects }: { tasks: TaskDto[]; projects: P
                           return (
                             <>
                               <span className="nav-emoji" style={{ width: 18 }}>
-                                {p?.emoji ?? '•'}
+                                <EntityIcon icon={p?.emoji} color={p?.color} size={13} />
                               </span>
                               {o.label}
                             </>

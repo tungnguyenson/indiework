@@ -6,10 +6,19 @@ import {
   type TaskPriority,
 } from '@/lib/domain';
 import { fmtDate, dueState } from '@/lib/dates';
-import { Ic, iconByName } from './icons';
+import { Ic, iconByName, isEmojiValue } from './icons';
+import { DynamicLucide } from './dyn-icon';
 
-/** A module's tinted icon (falls back to a color dot when no icon is set). */
-export function ModuleIcon({
+/**
+ * Renders a project/module identity icon from a single stored value:
+ *  - empty        → a color dot
+ *  - emoji/glyph  → the glyph, verbatim
+ *  - facade key   → curated `Ic` icon (checked first; handles legacy aliases
+ *                   like `cube`→Box, `sparkle`→Sparkles)
+ *  - kebab name   → lazy full-library Lucide icon
+ * Lucide branches are tinted with `color`; emoji glyphs render in their own hue.
+ */
+export function EntityIcon({
   icon,
   color,
   size = 13,
@@ -19,13 +28,30 @@ export function ModuleIcon({
   size?: number;
 }) {
   if (!icon) return <span className="dot" style={{ background: color ?? 'var(--text-faint)' }} />;
-  const IconC = iconByName(icon);
+  if (isEmojiValue(icon)) {
+    return (
+      <span className="ei-emoji" style={{ fontSize: size + 2 }}>
+        {icon}
+      </span>
+    );
+  }
+  if (icon in Ic) {
+    const IconC = iconByName(icon);
+    return (
+      <span className="mod-ic" style={{ color: color ?? 'var(--text-faint)' }}>
+        <IconC size={size} />
+      </span>
+    );
+  }
   return (
     <span className="mod-ic" style={{ color: color ?? 'var(--text-faint)' }}>
-      <IconC size={size} />
+      <DynamicLucide name={icon} size={size} />
     </span>
   );
 }
+
+/** Back-compat alias — many call sites still import `ModuleIcon`. */
+export const ModuleIcon = EntityIcon;
 
 export function StatusChip({
   status,

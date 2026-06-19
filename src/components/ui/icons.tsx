@@ -53,6 +53,7 @@ import {
   Archive,
   ArchiveRestore,
   Maximize2,
+  LogOut,
   type LucideProps,
 } from 'lucide-react';
 
@@ -114,6 +115,7 @@ export const Ic = {
   archive: make(Archive),
   restore: make(ArchiveRestore),
   maximize: make(Maximize2),
+  logout: make(LogOut),
 };
 
 export type IconName = keyof typeof Ic;
@@ -121,4 +123,14 @@ export type IconName = keyof typeof Ic;
 /** Resolve an icon by string key (e.g. a module's `icon`), with a fallback. */
 export function iconByName(name: string | null | undefined, fallback: IconName = 'cube') {
   return (name && name in Ic ? Ic[name as IconName] : Ic[fallback]);
+}
+
+/**
+ * A stored icon value is either an emoji glyph or a Lucide key — the two spaces
+ * are disjoint, so we infer the kind from the value (no discriminator column).
+ * Lucide names (facade keys + canonical kebab names) are lowercase ASCII words;
+ * anything else (🚀, ◈, …) is an emoji/glyph to render verbatim.
+ */
+export function isEmojiValue(value: string | null | undefined): boolean {
+  return !!value && !/^[a-z0-9-]+$/.test(value);
 }

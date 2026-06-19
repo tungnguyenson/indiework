@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Modal } from '@/components/ui/modal';
-import { EmojiPicker } from '@/components/ui/emoji-picker';
+import { IconPicker } from '@/components/ui/icon-picker';
 import { createProject } from '@/app/_actions/projects';
 import { PROJECT_COLORS, suggestKey } from '@/lib/colors';
 import { isValidProjectKey } from '@/lib/domain';
@@ -75,7 +75,13 @@ export function ProjectForm({
       <div className="field-row">
         <div className="field" style={{ flex: 'none' }}>
           <label>Icon</label>
-          <EmojiPicker value={emoji} onPick={setEmoji} triggerClass="emoji-solo" />
+          <IconPicker
+            value={emoji}
+            onPick={(p) => p.value !== undefined && setEmoji(p.value)}
+            triggerClass="emoji-solo"
+            triggerSize={22}
+            showColor={false}
+          />
         </div>
         <div className="field">
           <label>Name</label>

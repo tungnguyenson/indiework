@@ -7,9 +7,11 @@ import type { ShellData } from '@/server/load';
 import { PROJECT_STATUS, PROJECT_STATUS_LABEL, type ProjectStatus } from '@/lib/domain';
 import { setActiveWorkspace } from '@/app/_actions/workspace';
 import { updateProject } from '@/app/_actions/projects';
+import { logout } from '@/app/_actions/auth';
 import { BrandMark } from '@/components/ui/brand';
 import { Popover } from '@/components/ui/popover';
 import { Ic } from '@/components/ui/icons';
+import { EntityIcon } from '@/components/ui/bits';
 
 type Projects = ShellData['projects'];
 
@@ -169,7 +171,9 @@ export function Sidebar({
                           href={href}
                           data-active={pathname.startsWith(href) ? '' : undefined}
                         >
-                          <span className="nav-emoji">{p.emoji ?? '•'}</span>
+                          <span className="nav-emoji">
+                            <EntityIcon icon={p.emoji} color={p.color} size={13} />
+                          </span>
                           <span className="nav-label">{p.name}</span>
                           {p.issues > 0 && (
                             <span className="nav-badge" data-muted="">
@@ -213,6 +217,11 @@ export function Sidebar({
         >
           <Ic.settings size={16} /> Settings
         </Link>
+        <form action={logout} className="sb-footform">
+          <button className="sb-footbtn" type="submit">
+            <Ic.logout size={16} /> Log out
+          </button>
+        </form>
       </div>
     </aside>
   );
