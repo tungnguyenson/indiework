@@ -6,6 +6,7 @@ import type { ShellData } from '@/server/load';
 import { PROJECT_STATUS, PROJECT_STATUS_LABEL, type ProjectStatus } from '@/lib/domain';
 import { unarchiveProject } from '@/app/_actions/projects';
 import { Ic } from '@/components/ui/icons';
+import { EntityIcon } from '@/components/ui/bits';
 
 type Projects = ShellData['projects'];
 
@@ -128,7 +129,9 @@ function ProjectRow({
   return (
     <tr className="pt-row" data-archived={onRestore ? '' : undefined} onClick={onOpen}>
       <td className="pt-name">
-        <span className="nav-emoji">{p.emoji ?? '•'}</span>
+        <span className="nav-emoji">
+          <EntityIcon icon={p.emoji} color={p.color} size={13} />
+        </span>
         <span className="pt-pname">{p.name}</span>
         <span className="pt-key">{p.key}</span>
       </td>

@@ -10,6 +10,7 @@ import { updateProject } from '@/app/_actions/projects';
 import { BrandMark } from '@/components/ui/brand';
 import { Popover } from '@/components/ui/popover';
 import { Ic } from '@/components/ui/icons';
+import { EntityIcon } from '@/components/ui/bits';
 
 type Projects = ShellData['projects'];
 
@@ -169,7 +170,9 @@ export function Sidebar({
                           href={href}
                           data-active={pathname.startsWith(href) ? '' : undefined}
                         >
-                          <span className="nav-emoji">{p.emoji ?? '•'}</span>
+                          <span className="nav-emoji">
+                            <EntityIcon icon={p.emoji} color={p.color} size={13} />
+                          </span>
                           <span className="nav-label">{p.name}</span>
                           {p.issues > 0 && (
                             <span className="nav-badge" data-muted="">

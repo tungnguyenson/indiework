@@ -51,6 +51,7 @@ interface Project {
   key: string;
   name: string;
   emoji: string | null;
+  color: string | null;
   pinned: boolean;
 }
 
