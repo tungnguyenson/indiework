@@ -96,8 +96,9 @@ function PickerBody({
   onPick: IconPickerProps['onPick'];
   close: () => void;
 }) {
+  // Default to Icons (Lucide) — only open on Emoji when the current value is one.
   const [tab, setTab] = useState<'emoji' | 'icon'>(
-    value && !isEmojiValue(value) ? 'icon' : 'emoji',
+    value && isEmojiValue(value) ? 'emoji' : 'icon',
   );
 
   return (
@@ -106,18 +107,18 @@ function PickerBody({
         <button
           type="button"
           role="tab"
-          data-on={tab === 'emoji' ? '' : undefined}
-          onClick={() => setTab('emoji')}
-        >
-          Emoji
-        </button>
-        <button
-          type="button"
-          role="tab"
           data-on={tab === 'icon' ? '' : undefined}
           onClick={() => setTab('icon')}
         >
           Icons
+        </button>
+        <button
+          type="button"
+          role="tab"
+          data-on={tab === 'emoji' ? '' : undefined}
+          onClick={() => setTab('emoji')}
+        >
+          Emoji
         </button>
       </div>
 

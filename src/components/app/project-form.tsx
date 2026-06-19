@@ -19,7 +19,7 @@ export function ProjectForm({
   const [name, setName] = useState('');
   const [keyTouched, setKeyTouched] = useState(false);
   const [key, setKey] = useState('');
-  const [emoji, setEmoji] = useState('🚀');
+  const [emoji, setEmoji] = useState('cube');
   const [color, setColor] = useState<string>(PROJECT_COLORS[0]);
   const [shortDesc, setShortDesc] = useState('');
   const [statusNote, setStatusNote] = useState('');
