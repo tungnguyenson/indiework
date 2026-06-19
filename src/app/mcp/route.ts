@@ -15,6 +15,7 @@ import {
   workspaceService,
 } from '@/server/services';
 import { requireBearer, MCP_COMMENT_SOURCE } from '@/server/auth/token';
+import { apiRateState } from '@/server/auth/rate-limit';
 import { ServiceError } from '@/server/services';
 import {
   TASK_STATUS,
@@ -554,6 +555,13 @@ async function handleMessage(msg: Json): Promise<Json | null> {
 }
 
 export async function POST(req: Request) {
+  const rate = apiRateState(req);
+  if (rate.limited) {
+    return Response.json(rpcError(null, -32099, 'Too many requests'), {
+      status: 429,
+      headers: { 'Retry-After': String(rate.retryAfterSec) },
+    });
+  }
   if (!requireBearer(req)) {
     return Response.json(rpcError(null, -32001, 'Unauthorized'), { status: 401 });
   }

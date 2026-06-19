@@ -1,5 +1,11 @@
 import { describe, test, expect } from 'vitest';
-import { LoginRateLimiter, clientIp, sleep } from '@/server/auth/rate-limit';
+import {
+  LoginRateLimiter,
+  RequestRateLimiter,
+  apiRateState,
+  clientIp,
+  sleep,
+} from '@/server/auth/rate-limit';
 
 /** Small, explicit config so every assertion's arithmetic is obvious. */
 const makeLimiter = () =>
@@ -128,5 +134,56 @@ describe('clientIp', () => {
 describe('sleep', () => {
   test('resolves immediately for non-positive delays', async () => {
     await expect(sleep(0)).resolves.toBeUndefined();
+  });
+});
+
+describe('RequestRateLimiter — per-key request cap', () => {
+  const makeLimiter = () => new RequestRateLimiter({ limit: 3, windowMs: 1_000 });
+
+  test('allows up to the limit, then blocks', () => {
+    const rl = makeLimiter();
+    expect(rl.hit('k', 0).limited).toBe(false); // 1
+    expect(rl.hit('k', 1).limited).toBe(false); // 2
+    expect(rl.hit('k', 2).limited).toBe(false); // 3
+    const over = rl.hit('k', 3); // 4 → over quota
+    expect(over.limited).toBe(true);
+    expect(over.retryAfterSec).toBeGreaterThanOrEqual(1);
+  });
+
+  test('retryAfterSec reflects when the oldest hit ages out', () => {
+    const rl = makeLimiter();
+    rl.hit('k', 0);
+    rl.hit('k', 0);
+    rl.hit('k', 0); // window anchored at t=0, frees at t=1000
+    expect(rl.hit('k', 100).retryAfterSec).toBe(1); // 900ms remaining → ceil → 1s
+  });
+
+  test('the window slides — a slot frees once the oldest hit expires', () => {
+    const rl = makeLimiter();
+    rl.hit('k', 0);
+    rl.hit('k', 0);
+    rl.hit('k', 0);
+    expect(rl.hit('k', 500).limited).toBe(true); // still inside the window
+    expect(rl.hit('k', 1001).limited).toBe(false); // the first three aged out
+  });
+
+  test('keys are throttled independently', () => {
+    const rl = makeLimiter();
+    rl.hit('a', 0);
+    rl.hit('a', 0);
+    rl.hit('a', 0);
+    expect(rl.hit('a', 0).limited).toBe(true);
+    expect(rl.hit('b', 0).limited).toBe(false);
+  });
+});
+
+describe('apiRateState', () => {
+  const req = (ip?: string) =>
+    new Request('http://x/api', ip ? { headers: { 'x-forwarded-for': ip } } : undefined);
+
+  test('runs end-to-end against the real singleton and starts unlimited', () => {
+    // Fresh, distinct IPs so this doesn't collide with the shared bucket.
+    expect(apiRateState(req('198.51.100.5')).limited).toBe(false);
+    expect(apiRateState(req()).limited).toBe(false); // header-less → shared "unknown" bucket
   });
 });

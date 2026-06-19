@@ -162,3 +162,79 @@ export function clientIp(reqHeaders: Headers): string | null {
 /** Non-blocking delay helper. */
 export const sleep = (ms: number): Promise<void> =>
   ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+
+// ---------------------------------------------------------------------------
+// Bearer API / MCP throttle
+// ---------------------------------------------------------------------------
+/**
+ * Per-IP sliding-window request cap for the Bearer surface (REST + MCP). The
+ * token is high-entropy so brute-force isn't the threat; this guards against
+ * abuse / request floods. It's a soft, self-healing 429 (the window drains on
+ * its own), so — unlike the login hard-lock — a shared `'unknown'` bucket for
+ * header-less callers is acceptable: a flood can briefly 429 a header-less
+ * operator, but it clears within the window rather than locking them out.
+ */
+export interface RequestRateConfig {
+  /** Max requests allowed per key within the window. */
+  limit: number;
+  /** Sliding window length (ms). */
+  windowMs: number;
+}
+
+export interface RequestRateResult {
+  /** True when the key is over its quota for the current window. */
+  limited: boolean;
+  /** Whole seconds until a slot frees up (ceil, min 1); 0 when not limited. */
+  retryAfterSec: number;
+}
+
+export class RequestRateLimiter {
+  private readonly hits = new Map<string, number[]>();
+  /** Last full-map sweep; throttled to once per window to stay cheap. */
+  private lastSweep = 0;
+
+  constructor(private readonly cfg: RequestRateConfig) {}
+
+  /** Record a request for `key`; returns whether it is over quota. */
+  hit(key: string, now: number = Date.now()): RequestRateResult {
+    this.maybeSweep(now);
+    const fresh = (this.hits.get(key) ?? []).filter((t) => now - t < this.cfg.windowMs);
+
+    if (fresh.length >= this.cfg.limit) {
+      // Over quota: don't count this request (let the window drain on its own).
+      this.hits.set(key, fresh);
+      const oldest = fresh[0];
+      return {
+        limited: true,
+        retryAfterSec: Math.max(1, Math.ceil((oldest + this.cfg.windowMs - now) / 1000)),
+      };
+    }
+
+    this.hits.set(key, [...fresh, now]);
+    return { limited: false, retryAfterSec: 0 };
+  }
+
+  /** Drop keys whose hits have all aged out — at most once per window. */
+  private maybeSweep(now: number): void {
+    if (now - this.lastSweep < this.cfg.windowMs) return;
+    this.lastSweep = now;
+    for (const [key, arr] of this.hits) {
+      const fresh = arr.filter((t) => now - t < this.cfg.windowMs);
+      if (fresh.length === 0) this.hits.delete(key);
+      else if (fresh.length !== arr.length) this.hits.set(key, fresh);
+    }
+  }
+}
+
+/**
+ * Shared singleton for the Bearer surface. 300/min per IP is far above any
+ * human + agent workload (bulk writes go through single `create_tasks` /
+ * `update_tasks` calls) but caps a flood at 5 req/s per IP.
+ */
+export const apiRateLimiter = new RequestRateLimiter({ limit: 300, windowMs: 60_000 });
+
+/** Rate-limit state for a Bearer API/MCP request, keyed by client IP. */
+export function apiRateState(req: Request): RequestRateResult {
+  const ip = clientIp(req.headers) ?? 'unknown';
+  return apiRateLimiter.hit(ip);
+}

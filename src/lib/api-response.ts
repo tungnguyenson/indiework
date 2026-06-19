@@ -14,6 +14,13 @@ export function unauthorized(): Response {
   return fail('Unauthorized', 401);
 }
 
+export function tooManyRequests(retryAfterSec: number): Response {
+  return Response.json(
+    { data: null, error: 'Too many requests' },
+    { status: 429, headers: { 'Retry-After': String(retryAfterSec) } },
+  );
+}
+
 export function handleServiceError(e: unknown): Response {
   if (e instanceof ZodError) {
     const msg = e.issues.map((i) => `${i.path.join('.') || 'input'}: ${i.message}`).join('; ');

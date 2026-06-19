@@ -1,10 +1,13 @@
 import { commentService } from '@/server/services';
 import { requireBearer, API_COMMENT_SOURCE } from '@/server/auth/token';
-import { ok, unauthorized, handleServiceError } from '@/lib/api-response';
+import { apiRateState } from '@/server/auth/rate-limit';
+import { ok, unauthorized, tooManyRequests, handleServiceError } from '@/lib/api-response';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const rate = apiRateState(req);
+  if (rate.limited) return tooManyRequests(rate.retryAfterSec);
   if (!requireBearer(req)) return unauthorized();
   try {
     const { id } = await ctx.params;
