@@ -201,6 +201,7 @@ export const comments = pgTable(
     body: text('body').notNull(), // markdown
     source: text('source', { enum: COMMENT_SOURCE }).notNull().default('web'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    editedAt: timestamp('edited_at', { withTimezone: true }), // null until first edit → drives the "edited" badge
   },
   (t) => [index('comments_task_idx').on(t.taskId)],
 );

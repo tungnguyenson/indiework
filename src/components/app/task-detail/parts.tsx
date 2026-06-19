@@ -92,63 +92,6 @@ export function StatusNote({
   );
 }
 
-export function CommentBox({ onSend }: { onSend: (body: string) => Promise<void> }) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  const [v, setV] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  // Auto-grow to fit the full comment — a fixed rows={1} textarea scrolled new
-  // lines out of view, so typing Enter hid the lines above (IW-16).
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
-  }, [v]);
-
-  const send = async () => {
-    if (!v.trim() || busy) return;
-    setBusy(true);
-    try {
-      await onSend(v.trim());
-      setV('');
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <div className="comment-box">
-      <textarea
-        ref={ref}
-        value={v}
-        rows={2}
-        placeholder="Log progress…"
-        onChange={(e) => setV(e.target.value)}
-        onKeyDown={(e) => {
-          // ⌘/Ctrl+Enter sends; plain Enter inserts a newline so multi-line
-          // notes (e.g. agent context dumps) stay easy to compose.
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault();
-            send();
-          }
-        }}
-      />
-      <div className="comment-foot">
-        <button
-          className="comment-send"
-          type="button"
-          onClick={send}
-          disabled={!v.trim() || busy}
-          aria-label="Add comment"
-          title="Add comment (⌘+Enter)"
-        >
-          <Ic.arrowUp size={16} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export function SubRow({
   child,
   onOpen,

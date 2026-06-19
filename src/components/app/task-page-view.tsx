@@ -23,7 +23,7 @@ import { ParentLink, TaskProperties, TaskSubtasks, TaskActivity, DeleteControl }
 
 export function TaskPageView({ taskRef, initialDetail }: { taskRef: string; initialDetail: TaskDetail }) {
   const router = useRouter();
-  const { detail, missing, patch, saveStatusNote, addComment, addChild, toggleChild, remove, reload } = useTaskDetail({
+  const { detail, missing, patch, saveStatusNote, addComment, editComment, addChild, toggleChild, remove, reload } = useTaskDetail({
     taskRef,
     taskId: null,
     initialDetail,
@@ -114,7 +114,7 @@ export function TaskPageView({ taskRef, initialDetail }: { taskRef: string; init
 
           <Attachments taskId={task.id} items={attachments} onChanged={reload} />
 
-          <TaskActivity comments={comments} addComment={addComment} />
+          <TaskActivity comments={comments} addComment={addComment} editComment={editComment} />
         </main>
 
         <aside className="tp-side">

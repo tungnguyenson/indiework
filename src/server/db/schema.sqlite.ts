@@ -225,6 +225,7 @@ export const comments = sqliteTable(
     createdAt: integer('created_at', { mode: 'timestamp' })
       .notNull()
       .default(sql`(unixepoch())`),
+    editedAt: integer('edited_at', { mode: 'timestamp' }), // null until first edit → drives the "edited" badge
   },
   (t) => [index('comments_task_idx').on(t.taskId)],
 );

@@ -120,22 +120,41 @@
 .act-item:last-of-type { border-bottom: none; }
 .act-day { font: 500 11.5px/1.4 var(--font-mono); color: var(--text-faint); flex: none; width: 38px; padding-top: 1px; }
 .act-body { flex: 1; min-width: 0; }
-.act-text { font-size: 13.5px; line-height: 1.55; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+/* Comments render markdown via the shared .md-render engine; tighten it to the
+   activity scale and drop the read-card padding (the source-text fallback shown
+   while the renderer loads also lands here). */
+.act-text.md-render { padding: 0; font-size: 13.5px; line-height: 1.55; color: var(--text); overflow-wrap: anywhere; }
+.act-meta { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 .act-src { font-size: 10px; font-weight: 680; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 6px;
-  border-radius: var(--r-pill); margin-left: 7px; vertical-align: middle; }
+  border-radius: var(--r-pill); display: inline-block; vertical-align: middle; }
 .act-src[data-src="web"] { color: var(--text-muted); background: var(--bg-active); }
 .act-src[data-src="api"] { color: var(--st-todo); background: var(--st-todo-bg); }
 .act-src[data-src="agent"] { color: var(--st-inbox); background: var(--st-inbox-bg); }
+.act-edited { font-size: 11px; font-style: italic; color: var(--text-faint); }
+/* Click-to-edit: the comment text itself is the affordance (blur saves, Esc
+   cancels — no button). Subtle hover/focus surface signals it's interactive;
+   negative margin offsets the padding so text stays aligned with the day column. */
+.act-text-edit { border-radius: var(--r-sm); padding: 3px 6px; margin: -3px -6px; cursor: text; transition: background .12s; }
+.act-text-edit:hover { background: var(--bg-active); }
+.act-text-edit:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 1px; }
 .comment-box { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin-top: 14px;
   border: 1px solid var(--border); border-radius: var(--r-md); padding: 11px 13px; background: var(--bg-surface); transition: .14s; }
 .comment-box:focus-within { border-color: var(--accent-ring); box-shadow: 0 0 0 3px var(--accent-softer); }
-.comment-box textarea { width: 100%; border: none; background: none; outline: none; resize: none; font-family: inherit;
-  font-size: 13.5px; line-height: 1.55; color: var(--text-strong); min-height: 44px; max-height: 220px; overflow-y: auto; }
+/* The composer is a Tiptap editor; .comment-box owns the border + focus ring, so
+   strip the editor's own .md-wysiwyg chrome and keep the old textarea sizing. */
+.comment-box .md-wysiwyg { padding: 0; min-height: 44px; max-height: 220px; overflow-y: auto;
+  border: none; border-radius: 0; background: none; font-size: 13.5px; line-height: 1.55; color: var(--text-strong); }
+.comment-box .md-wysiwyg:hover { border: none; }
+.comment-box .md-wysiwyg.ProseMirror-focused { border: none; box-shadow: none; }
+.comment-box--loading { min-height: 68px; }
 .comment-foot { display: flex; align-items: center; justify-content: flex-end; }
 .comment-send { border: none; background: var(--accent); color: #fff; width: 30px; height: 30px; border-radius: 50%;
   display: grid; place-items: center; flex: none; transition: .12s; }
 .comment-send:hover:not(:disabled) { background: var(--accent-strong); }
 .comment-send:disabled { background: var(--bg-active); color: var(--text-faint); }
+/* Edit-in-place variant: inline in an activity row (no top gap), blur-to-save so
+   no footer/buttons — just the bordered editor box reusing .comment-box chrome. */
+.comment-box--edit { margin-top: 0; }
 
 .dp-foot { display: flex; align-items: center; padding: 12px 22px; border-top: 1px solid var(--border-soft); }
 .del-btn { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--border-soft); background: none;

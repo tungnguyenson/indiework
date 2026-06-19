@@ -1,6 +1,6 @@
 import { asc, eq } from 'drizzle-orm';
 import { db, schema } from '@/server/db';
-import { addCommentSchema } from '@/server/validators/comment';
+import { addCommentSchema, updateCommentSchema } from '@/server/validators/comment';
 import type { CommentSource } from '@/lib/domain';
 import { notFound } from './errors';
 
@@ -28,6 +28,23 @@ export const commentService = {
       .insert(schema.comments)
       .values({ taskId: data.taskId, body: data.body, source: data.source ?? defaultSource })
       .returning();
+    return row;
+  },
+
+  /**
+   * Edit a comment's body in place. Stamps `editedAt` (which drives the "edited"
+   * badge) but keeps the original `source`, so an edited agent/mcp note stays
+   * badged with its provenance.
+   */
+  async update(input: unknown) {
+    const data = updateCommentSchema.parse(input);
+
+    const [row] = await db
+      .update(schema.comments)
+      .set({ body: data.body, editedAt: new Date() })
+      .where(eq(schema.comments.id, data.id))
+      .returning();
+    if (!row) throw notFound('comment');
     return row;
   },
 };

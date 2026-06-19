@@ -26,7 +26,7 @@ export function DetailPanel({
   onClose: () => void;
 }) {
   const { openTask } = useTaskNav();
-  const { detail, missing, patch, saveStatusNote, addComment, addChild, toggleChild, remove, reload } = useTaskDetail({
+  const { detail, missing, patch, saveStatusNote, addComment, editComment, addChild, toggleChild, remove, reload } = useTaskDetail({
     taskRef,
     taskId,
   });
@@ -111,7 +111,7 @@ export function DetailPanel({
 
         <Attachments taskId={task.id} items={attachments} onChanged={reload} />
 
-        <TaskActivity comments={comments} addComment={addComment} />
+        <TaskActivity comments={comments} addComment={addComment} editComment={editComment} />
       </div>
 
       <div className="dp-foot">

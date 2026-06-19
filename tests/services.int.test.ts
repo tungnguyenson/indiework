@@ -96,6 +96,23 @@ describe('service slice (real Postgres)', () => {
     expect(list[1].source).toBe('agent');
   });
 
+  test('update edits a comment body, stamps editedAt, keeps source', async () => {
+    const t = await taskService.create({ projectId, title: 'Editable' });
+    const created = await commentService.add({ taskId: t.id, body: 'first draft', source: 'agent' });
+    expect(created.editedAt).toBeNull();
+
+    const edited = await commentService.update({ id: created.id, body: 'revised text' });
+    expect(edited.body).toBe('revised text');
+    expect(edited.source).toBe('agent'); // provenance preserved across an edit
+    expect(edited.editedAt).toBeInstanceOf(Date);
+  });
+
+  test('update throws not_found for an unknown comment id', async () => {
+    await expect(
+      commentService.update({ id: '00000000-0000-0000-0000-000000000000', body: 'nope' }),
+    ).rejects.toMatchObject({ code: 'not_found' });
+  });
+
   test('getByRef resolves a display ref', async () => {
     const t = await taskService.getByRef('ZZTEST-1');
     expect(t.title).toBe('First');

@@ -16,6 +16,7 @@ import {
   updateTask,
   setTaskStatusNote,
   addTaskComment,
+  editTaskComment,
   deleteTask,
   addSubtask,
   toggleTaskDone,
@@ -105,6 +106,17 @@ export function useTaskDetail({
     [detail, fetchDetail, router],
   );
 
+  const editComment = useCallback(
+    async (commentId: string, body: string) => {
+      if (!detail) return;
+      await editTaskComment(commentId, body);
+      const fresh = await fetchDetail();
+      setDetail(fresh);
+      router.refresh();
+    },
+    [detail, fetchDetail, router],
+  );
+
   const addChild = useCallback(
     async (title: string) => {
       if (!detail) return;
@@ -141,6 +153,7 @@ export function useTaskDetail({
     patch,
     saveStatusNote,
     addComment,
+    editComment,
     addChild,
     toggleChild,
     remove,
