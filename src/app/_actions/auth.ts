@@ -1,6 +1,6 @@
 'use server';
 
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import {
   passwordMatches,
@@ -8,6 +8,12 @@ import {
   SESSION_COOKIE,
   SESSION_MAX_AGE,
 } from '@/server/auth/session';
+import {
+  loginRateLimiter,
+  clientIp,
+  sleep,
+  LOGIN_CONSTANT_DELAY_MS,
+} from '@/server/auth/rate-limit';
 
 /** Only allow redirecting back into the app, never to an external URL. */
 function safeNext(next: string): string {
@@ -20,9 +26,32 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
   const password = String(formData.get('password') ?? '');
   const next = safeNext(String(formData.get('next') ?? '/app'));
 
+  const ip = clientIp(await headers());
+
+  // Per-IP HARD lockout only when we have a distinguishable IP. Without a trusted
+  // forwarded header every caller collapses into one bucket, and a hard lock there
+  // would lock out the sole operator — so an indeterminate IP relies on the soft
+  // global throttle + constant delay only (the high-entropy APP_PASSWORD is the
+  // real control). When we do have an IP and it's already locked, refuse before
+  // touching the password: no wrong-password oracle, no CPU burned on HMAC.
+  if (ip) {
+    const gate = loginRateLimiter.check(ip);
+    if (gate.blocked) {
+      return { error: `Too many attempts. Try again in ${gate.retryAfterSec}s.` };
+    }
+  }
+
+  // Constant delay on every attempt, plus any global soft-throttle. Slows naive
+  // sequential brute force; see rate-limit.ts for the honest caveats.
+  await sleep(LOGIN_CONSTANT_DELAY_MS + loginRateLimiter.globalDelayMs());
+
   if (!(await passwordMatches(password))) {
+    if (ip) loginRateLimiter.fail(ip);
+    loginRateLimiter.recordGlobalFailure();
     return { error: 'Wrong password.' };
   }
+
+  if (ip) loginRateLimiter.reset(ip);
 
   const jar = await cookies();
   jar.set(SESSION_COOKIE, await createSessionValue(), {

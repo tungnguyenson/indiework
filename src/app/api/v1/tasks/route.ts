@@ -1,6 +1,7 @@
 import { taskService } from '@/server/services';
 import { requireBearer } from '@/server/auth/token';
-import { ok, unauthorized, handleServiceError } from '@/lib/api-response';
+import { apiRateState } from '@/server/auth/rate-limit';
+import { ok, unauthorized, tooManyRequests, handleServiceError } from '@/lib/api-response';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,6 +9,8 @@ const csv = (v: string | null) => v?.split(',').map((s) => s.trim()).filter(Bool
 const bool = (v: string | null) => (v === null ? undefined : v !== 'false');
 
 export async function GET(req: Request) {
+  const rate = apiRateState(req);
+  if (rate.limited) return tooManyRequests(rate.retryAfterSec);
   if (!requireBearer(req)) return unauthorized();
   try {
     const q = new URL(req.url).searchParams;
@@ -27,6 +30,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const rate = apiRateState(req);
+  if (rate.limited) return tooManyRequests(rate.retryAfterSec);
   if (!requireBearer(req)) return unauthorized();
   try {
     const body = await req.json();

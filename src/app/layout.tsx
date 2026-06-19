@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { Be_Vietnam_Pro, Plus_Jakarta_Sans, Hanken_Grotesk, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
 import '@/styles/tokens.css';
@@ -63,15 +64,19 @@ const fontBootScript = `(function(){try{var m=${JSON.stringify(FONT_STACK)},v=lo
   UI_FONT_DEFAULT,
 )}]);}catch(e){}})();`;
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const fontVars = `${beVietnamPro.variable} ${plusJakarta.variable} ${hanken.variable} ${plexMono.variable}`;
+  // The CSP (src/proxy.ts) is nonce-based with 'strict-dynamic', so this inline
+  // script only runs if it carries the per-request nonce — read it from the
+  // header the proxy set. (This also makes every route render dynamically.)
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
   // fontBootScript sets --font-ui on <html> before hydration, so the element's
   // style attribute legitimately differs from the server markup — suppress the
   // one-level hydration diff for <html> only.
   return (
     <html lang="en" className={fontVars} data-theme="light" suppressHydrationWarning>
       <body>
-        <script dangerouslySetInnerHTML={{ __html: fontBootScript }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: fontBootScript }} />
         {children}
       </body>
     </html>
