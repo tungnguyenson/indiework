@@ -22,6 +22,20 @@
       "when": 1781829974778,
       "tag": "0002_thin_post",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1782000000000,
+      "tag": "0003_identity_attribution",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781939815209,
+      "tag": "0004_uuid_v7_defaults",
+      "breakpoints": true
     }
   ]
 }

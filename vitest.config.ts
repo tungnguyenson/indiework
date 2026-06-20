@@ -8,6 +8,10 @@ try {
   // .env is optional (e.g. CI provides env directly).
 }
 
+// Test defaults for vars added after older .env files were created.
+process.env.ADMIN_EMAIL ??= 'test@example.com';
+process.env.ADMIN_PASSWORD ??= process.env.APP_PASSWORD ?? 'test-password';
+
 export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {

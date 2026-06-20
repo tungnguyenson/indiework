@@ -92,7 +92,7 @@ const slimModule = (m: { id: string; name: string; state: string }) => ({
 });
 const slimComment = (c: { id: string; source: string }) => ({ id: c.id, source: c.source });
 
-const TOOLS: Tool[] = [
+const TOOLS = (agentUserId: string): Tool[] => [
   {
     name: 'create_task',
     description: 'Create a task. Omit `project` to drop it into the Inbox. `project` is a project KEY (e.g. "SITE").',
@@ -119,7 +119,7 @@ const TOOLS: Tool[] = [
           status: a.status as never,
           priority: a.priority as never,
           dueDate: a.due_date ? new Date(a.due_date as string) : undefined,
-        }),
+        }, agentUserId),
       ),
   },
   {
@@ -164,7 +164,7 @@ const TOOLS: Tool[] = [
             status: it.status as never,
             priority: it.priority as never,
             dueDate: it.due_date ? new Date(it.due_date as string) : undefined,
-          });
+          }, agentUserId);
           results.push({ ok: true, ref: t.ref, id: t.id });
         } catch (e) {
           results.push({ ok: false, error: formatError(e) });
@@ -186,7 +186,7 @@ const TOOLS: Tool[] = [
       required: ['parent_ref', 'title'],
     },
     run: async (a) =>
-      slimTask(await taskService.addSubtask(await idFromRef(a.parent_ref), a.title as string, a.status as never)),
+      slimTask(await taskService.addSubtask(await idFromRef(a.parent_ref), a.title as string, a.status as never, agentUserId)),
   },
   {
     name: 'list_tasks',
@@ -274,6 +274,7 @@ const TOOLS: Tool[] = [
         await commentService.add(
           { taskId: await idFromRef(a.ref), body: a.body as string },
           MCP_COMMENT_SOURCE,
+          agentUserId,
         ),
       ),
   },
@@ -521,7 +522,7 @@ function rpcError(id: unknown, code: number, message: string) {
   return { jsonrpc: '2.0', id, error: { code, message } };
 }
 
-async function handleMessage(msg: Json): Promise<Json | null> {
+async function handleMessage(msg: Json, tools: Tool[]): Promise<Json | null> {
   const { id, method, params } = msg as { id?: unknown; method?: string; params?: Json };
 
   // Notifications have no id and expect no response.
@@ -538,11 +539,11 @@ async function handleMessage(msg: Json): Promise<Json | null> {
       return rpcResult(id, {});
     case 'tools/list':
       return rpcResult(id, {
-        tools: TOOLS.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema })),
+        tools: tools.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema })),
       });
     case 'tools/call': {
       const name = (params?.name as string) ?? '';
-      const tool = TOOLS.find((t) => t.name === name);
+      const tool = tools.find((t) => t.name === name);
       if (!tool) return rpcError(id, -32602, `Unknown tool: ${name}`);
       try {
         const result = await tool.run((params?.arguments as Json) ?? {});
@@ -557,9 +558,11 @@ async function handleMessage(msg: Json): Promise<Json | null> {
 }
 
 export async function POST(req: Request) {
-  if (!requireBearer(req)) {
+  const agentUserId = await requireBearer(req);
+  if (!agentUserId) {
     return Response.json(rpcError(null, -32001, 'Unauthorized'), { status: 401 });
   }
+  const tools = TOOLS(agentUserId);
   let body: unknown;
   try {
     body = await req.json();
@@ -568,12 +571,12 @@ export async function POST(req: Request) {
   }
 
   if (Array.isArray(body)) {
-    const responses = (await Promise.all(body.map((m) => handleMessage(m as Json)))).filter(Boolean);
+    const responses = (await Promise.all(body.map((m) => handleMessage(m as Json, tools)))).filter(Boolean);
     if (responses.length === 0) return new Response(null, { status: 202 });
     return Response.json(responses);
   }
 
-  const response = await handleMessage(body as Json);
+  const response = await handleMessage(body as Json, tools);
   if (!response) return new Response(null, { status: 202 });
   return Response.json(response);
 }

@@ -30,7 +30,8 @@ jobs:
       # Integration test (tests/services.int.test.ts) needs a live DB + the
       # server env (src/server/env.ts validates all four at import time).
       DATABASE_URL: postgres://indiework:indiework@localhost:5432/indiework
-      APP_PASSWORD: ci-test
+      ADMIN_EMAIL: ci-test@example.com
+      ADMIN_PASSWORD: ci-test
       COOKIE_SECRET: ci-cookie-secret-at-least-32-characters-long
       API_TOKEN: ci-token
       NODE_ENV: test

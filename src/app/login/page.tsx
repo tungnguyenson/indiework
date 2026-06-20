@@ -19,5 +19,7 @@ export default async function LoginPage({
   // build. Only the demo container sets DEMO_MODE=true.
   const demoHint =
     process.env.DEMO_MODE === 'true' ? (process.env.DEMO_HINT || 'demo') : undefined;
-  return <LoginForm next={next ?? '/app'} demoHint={demoHint} />;
+  const demoEmail =
+    process.env.DEMO_MODE === 'true' ? (process.env.DEMO_EMAIL || 'demo@demo.local') : undefined;
+  return <LoginForm next={next ?? '/app'} demoHint={demoHint} demoEmail={demoEmail} />;
 }

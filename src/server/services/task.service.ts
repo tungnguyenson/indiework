@@ -41,11 +41,11 @@ function sortTasks(a: TaskDto, b: TaskDto) {
 }
 
 export const taskService = {
-  async create(input: unknown): Promise<TaskDto> {
+  async create(input: unknown, createdById?: string | null): Promise<TaskDto> {
     const data = createTaskSchema.parse(input);
     // A task with a parent is a sub-task — route through addSubtask (inherits
     // the parent's project/module/milestone and allocates its own seq).
-    if (data.parentId) return this.addSubtask(data.parentId, data.title, data.status);
+    if (data.parentId) return this.addSubtask(data.parentId, data.title, data.status, createdById);
 
     const status: TaskStatus = data.status ?? (data.projectId ? 'todo' : 'inbox');
 
@@ -58,6 +58,7 @@ export const taskService = {
       dueDate: data.dueDate ?? null,
       priority: data.priority,
       status,
+      createdById: createdById ?? null,
       ...completedAtFor(status),
     };
 
@@ -181,6 +182,7 @@ export const taskService = {
     parentId: string,
     title: string,
     status?: TaskStatus,
+    createdById?: string | null,
   ): Promise<TaskDto> {
     const parent = await readDto(parentId);
     if (parent.parentId) throw badRequest('sub-tasks are one level deep');
@@ -197,6 +199,7 @@ export const taskService = {
       moduleId: parent.moduleId,
       milestoneId: parent.milestoneId,
       status: s,
+      createdById: createdById ?? null,
       ...completedAtFor(s),
     };
 

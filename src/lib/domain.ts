@@ -45,6 +45,9 @@ export const COMMENT_SOURCE = [
 
 export const API_KEY_SCOPE = ['read', 'write', 'read-write'] as const;
 
+/** User role — display label only; not enforced as RBAC in the indie app. */
+export const USER_ROLE = ['admin', 'agent'] as const;
+
 /** Attachment kind — drives thumbnail vs file-tile rendering (v3). */
 export const ATTACHMENT_TYPE = ['file', 'image'] as const;
 
@@ -101,6 +104,7 @@ export type ModuleIcon = (typeof MODULE_ICONS)[number];
 export type ProjectStatus = (typeof PROJECT_STATUS)[number];
 export type CommentSource = (typeof COMMENT_SOURCE)[number];
 export type ApiKeyScope = (typeof API_KEY_SCOPE)[number];
+export type UserRole = (typeof USER_ROLE)[number];
 export type AttachmentType = (typeof ATTACHMENT_TYPE)[number];
 
 // ---- Defaults ----

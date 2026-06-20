@@ -296,9 +296,14 @@ function CommentRow({
             >
               <MarkdownView value={comment.body} className="act-text" />
             </div>
-            {(comment.source !== 'web' || comment.editedAt) && (
+            {(comment.author?.role === 'agent' || comment.source !== 'web' || comment.editedAt) && (
               <div className="act-meta">
-                {comment.source !== 'web' && (
+                {comment.author?.role === 'agent' && (
+                  <span className="act-src" data-src="agent">
+                    Agent
+                  </span>
+                )}
+                {comment.author?.role !== 'agent' && comment.source !== 'web' && (
                   <span className="act-src" data-src={comment.source === 'mcp' ? 'agent' : comment.source}>
                     {comment.source}
                   </span>

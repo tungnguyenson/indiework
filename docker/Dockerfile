@@ -23,7 +23,8 @@ COPY . .
 # runtime via the compose env_file. No DB connection happens here: the pg pool
 # is lazy and every route is force-dynamic.
 ENV DATABASE_URL="postgres://build:build@127.0.0.1:5432/build" \
-    APP_PASSWORD="build-placeholder" \
+    ADMIN_EMAIL="build@example.com" \
+    ADMIN_PASSWORD="build-placeholder" \
     COOKIE_SECRET="build-placeholder-cookie-secret-at-least-32-chars" \
     API_TOKEN="build-placeholder" \
     NODE_ENV="production"

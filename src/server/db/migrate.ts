@@ -1,7 +1,8 @@
 /**
  * Apply pending migrations. Run via `pnpm db:migrate` (Node --env-file=.env).
  * Standalone (only needs DATABASE_URL) so it runs in the Docker entrypoint
- * before the app boots.
+ * before the app boots. UUID PKs are generated as v7 in the app (see newUuid);
+ * Postgres migrations drop the old gen_random_uuid() column defaults.
  *
  * Postgres uses a durable migration history (./drizzle). The sqlite path
  * (DB_DRIVER=sqlite) applies the schema with `drizzle-kit push` instead — see

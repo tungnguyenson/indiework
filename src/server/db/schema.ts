@@ -2,8 +2,8 @@
  * PostgreSQL schema (Drizzle) — the full IndieWork data model (docs/scope.md §2).
  *
  * Conventions:
- *  - PK: uuid, server-generated (gen_random_uuid). Internal only — public
- *    identity is the ref "KEY-seq" built from project.key + task.seq.
+ *  - PK: uuid v7, app-generated (newUuid). Internal only — public identity is
+ *    the ref "KEY-seq" built from project.key + task.seq.
  *  - enums: text + Drizzle `{ enum }` (type-safe at the TS layer; no native
  *    pg enums, which add migration friction for no benefit here).
  *  - timestamps: timestamptz, default now().
@@ -28,6 +28,7 @@ import {
   PROJECT_STATUS,
   COMMENT_SOURCE,
   API_KEY_SCOPE,
+  USER_ROLE,
   ATTACHMENT_TYPE,
   DEFAULT_TASK_STATUS,
   DEFAULT_TASK_PRIORITY,
@@ -35,15 +36,34 @@ import {
   DEFAULT_MODULE_STATE,
   DEFAULT_PROJECT_STATUS,
 } from '@/lib/domain';
+import { newUuid } from '@/lib/uuid';
+
+/** uuid v7 PK — generated app-side so Postgres and SQLite stay identical. */
+const uuidPk = () => uuid('id').primaryKey().$defaultFn(() => newUuid());
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 };
 
+// ---- users (identity for admin + agent attribution) ----
+export const users = pgTable(
+  'users',
+  {
+    id: uuidPk(),
+    email: text('email'), // required for admin; NULL for agents (passwordless, identified by name + api_key)
+    name: text('name').notNull(),
+    role: text('role', { enum: USER_ROLE }).notNull(),
+    passwordHash: text('password_hash'), // NULL for agents
+    disabledAt: timestamp('disabled_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex('users_email_unique').on(t.email)],
+);
+
 // ---- workspaces (top-level container above projects) ----
 export const workspaces = pgTable('workspaces', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuidPk(),
   name: text('name').notNull(),
   emoji: text('emoji'),
   tagline: text('tagline'),
@@ -54,7 +74,7 @@ export const workspaces = pgTable('workspaces', {
 export const projects = pgTable(
   'projects',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    id: uuidPk(),
     workspaceId: uuid('workspace_id').references(() => workspaces.id, {
       onDelete: 'set null',
     }),
@@ -91,7 +111,7 @@ export const projectCounters = pgTable('project_counters', {
 export const milestones = pgTable(
   'milestones',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    id: uuidPk(),
     projectId: uuid('project_id')
       .notNull()
       .references(() => projects.id, { onDelete: 'cascade' }),
@@ -111,7 +131,7 @@ export const milestones = pgTable(
 export const modules = pgTable(
   'modules',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    id: uuidPk(),
     projectId: uuid('project_id')
       .notNull()
       .references(() => projects.id, { onDelete: 'cascade' }),
@@ -131,7 +151,7 @@ export const modules = pgTable(
 export const tasks = pgTable(
   'tasks',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    id: uuidPk(),
     // project_id NULL = Inbox (not yet triaged)
     projectId: uuid('project_id').references(() => projects.id, {
       onDelete: 'cascade',
@@ -160,6 +180,7 @@ export const tasks = pgTable(
     position: integer('position').notNull().default(0),
     dueDate: timestamp('due_date', { withTimezone: true }),
     completedAt: timestamp('completed_at', { withTimezone: true }), // set on → done
+    createdById: uuid('created_by_id').references(() => users.id, { onDelete: 'set null' }),
     ...timestamps,
   },
   (t) => [
@@ -175,7 +196,7 @@ export const tasks = pgTable(
 export const attachments = pgTable(
   'attachments',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    id: uuidPk(),
     taskId: uuid('task_id')
       .notNull()
       .references(() => tasks.id, { onDelete: 'cascade' }),
@@ -194,12 +215,13 @@ export const attachments = pgTable(
 export const comments = pgTable(
   'comments',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    id: uuidPk(),
     taskId: uuid('task_id')
       .notNull()
       .references(() => tasks.id, { onDelete: 'cascade' }),
     body: text('body').notNull(), // markdown
     source: text('source', { enum: COMMENT_SOURCE }).notNull().default('web'),
+    createdById: uuid('created_by_id').references(() => users.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     editedAt: timestamp('edited_at', { withTimezone: true }), // null until first edit → drives the "edited" badge
   },
@@ -208,7 +230,8 @@ export const comments = pgTable(
 
 // ---- api_keys (managed, scoped tokens — built in Phase 4, table reserved) ----
 export const apiKeys = pgTable('api_keys', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuidPk(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   prefix: text('prefix').notNull().default('iw_live_'),
   hash: text('hash').notNull(), // sha-256 of the secret; shown once on create
@@ -222,7 +245,7 @@ export const apiKeys = pgTable('api_keys', {
 export const labels = pgTable(
   'labels',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    id: uuidPk(),
     projectId: uuid('project_id').references(() => projects.id, {
       onDelete: 'cascade',
     }),

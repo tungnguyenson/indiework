@@ -1,7 +1,7 @@
 /**
- * Session = a signed cookie proving "this person knows APP_PASSWORD".
- * Uses Web Crypto (HMAC-SHA256) so it runs in both the Edge middleware and
- * Node server actions. No user table — the single source of truth is .ENV.
+ * Session = a signed cookie embedding `userId` (no role — looked up server-side).
+ * Uses Web Crypto (HMAC-SHA256) so it runs in both the Edge proxy and Node
+ * server actions.
  */
 import { env } from '@/server/env';
 
@@ -29,26 +29,36 @@ async function hmac(message: string): Promise<string> {
   return b64url(sig);
 }
 
-/** Build a fresh signed session value: "<issuedAtMs>.<hmac>". */
-export async function createSessionValue(): Promise<string> {
+/** Build a fresh signed session value: "<userId>.<issuedAtMs>.<hmac>". */
+export async function createSessionValue(userId: string): Promise<string> {
   const issued = Date.now().toString();
-  return `${issued}.${await hmac(issued)}`;
+  const payload = `${userId}.${issued}`;
+  return `${payload}.${await hmac(payload)}`;
+}
+
+export type ParsedSession = { userId: string; issuedAt: number };
+
+/** Parse and cryptographically verify a session cookie value. */
+export async function parseSessionValue(
+  value: string | undefined | null,
+): Promise<ParsedSession | null> {
+  if (!value) return null;
+  const lastDot = value.lastIndexOf('.');
+  if (lastDot <= 0) return null;
+  const sig = value.slice(lastDot + 1);
+  const rest = value.slice(0, lastDot);
+  const firstDot = rest.indexOf('.');
+  if (firstDot <= 0) return null;
+  const userId = rest.slice(0, firstDot);
+  const issued = rest.slice(firstDot + 1);
+  if (sig !== (await hmac(rest))) return null;
+  const ts = Number(issued);
+  if (!Number.isFinite(ts)) return null;
+  if (Date.now() - ts > SESSION_MAX_AGE * 1000) return null;
+  return { userId, issuedAt: ts };
 }
 
 /** Validate a session cookie value: signature matches and not expired. */
 export async function verifySessionValue(value: string | undefined | null): Promise<boolean> {
-  if (!value) return false;
-  const dot = value.lastIndexOf('.');
-  if (dot <= 0) return false;
-  const issued = value.slice(0, dot);
-  const sig = value.slice(dot + 1);
-  if (sig !== (await hmac(issued))) return false;
-  const ts = Number(issued);
-  if (!Number.isFinite(ts)) return false;
-  return Date.now() - ts <= SESSION_MAX_AGE * 1000;
-}
-
-/** Constant-time-ish password check (compares HMACs, not raw strings). */
-export async function passwordMatches(password: string): Promise<boolean> {
-  return (await hmac(password)) === (await hmac(env.APP_PASSWORD));
+  return (await parseSessionValue(value)) !== null;
 }

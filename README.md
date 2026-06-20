@@ -33,11 +33,11 @@ Bearer token (API/MCP).
 You need Docker. From the repo root:
 
 ```bash
-cp .env.example .env      # then edit: set APP_PASSWORD, COOKIE_SECRET, API_TOKEN
+cp .env.example .env      # then edit: set ADMIN_EMAIL, ADMIN_PASSWORD, COOKIE_SECRET, API_TOKEN
 docker compose -f docker/compose.postgres-container.yml up -d
 ```
 
-Open <http://localhost:3000>, log in with `APP_PASSWORD`, and you're in. The container
+Open <http://localhost:3000>, sign in with `ADMIN_EMAIL` / `ADMIN_PASSWORD`, and you're in. The container
 runs migrations + seeds a default workspace on boot; Postgres data persists in a volume.
 
 > Already run Postgres on the host and only want the app in Docker? Use
@@ -55,7 +55,7 @@ for trying it out or a local demo), **Postgres** is the production default.
 
 ```bash
 pnpm install
-cp .env.example .env              # set APP_PASSWORD, COOKIE_SECRET, API_TOKEN — DATABASE_URL not needed
+cp .env.example .env              # set ADMIN_EMAIL, ADMIN_PASSWORD, COOKIE_SECRET, API_TOKEN — DATABASE_URL not needed
 pnpm db:push:sqlite               # create the schema in ./data/iw.db
 pnpm db:seed:sample:sqlite        # optional: 4 demo projects + tasks (or `db:seed:sqlite` for just a workspace)
 DB_DRIVER=sqlite pnpm dev         # http://localhost:3000
@@ -98,7 +98,7 @@ macOS. You may pick any role/password/db names; just match them in `DATABASE_URL
 
 ```bash
 pnpm install
-cp .env.example .env                             # set APP_PASSWORD, COOKIE_SECRET, API_TOKEN (+ DATABASE_URL host)
+cp .env.example .env                             # set ADMIN_EMAIL, ADMIN_PASSWORD, COOKIE_SECRET, API_TOKEN (+ DATABASE_URL host)
 pnpm db:migrate                                  # apply migrations
 pnpm db:seed                                     # default workspace
 pnpm db:seed:sample                              # optional demo project + tasks
@@ -125,9 +125,15 @@ Prefer a zero-dependency backend (no Postgres) for a self-host or demo? See **[S
 | `DB_DRIVER` | `postgres` (default) or `sqlite` — picks the database backend |
 | `DATABASE_URL` | Postgres connection string (required when `DB_DRIVER=postgres`) |
 | `SQLITE_PATH` | SQLite file path when `DB_DRIVER=sqlite` (default `./data/iw.db`) |
-| `APP_PASSWORD` | Web login password (single user) |
+| `ADMIN_EMAIL` | Admin login email (seeded on first boot) |
+| `ADMIN_PASSWORD` | Admin login password |
 | `COOKIE_SECRET` | Signs the session cookie (≥ 32 chars) |
-| `API_TOKEN` | Bearer token for the REST API + MCP |
+| `API_TOKEN` | Bearer token for REST API + MCP (deprecated; maps to `default-agent`) |
+
+Forgot or need to change the admin password? Set `ADMIN_PASSWORD` in `.env`, then run
+`pnpm db:reset-admin-password` (see **[UPGRADING.md](UPGRADING.md)**).
+
+> Upgrading from an older install? See **[UPGRADING.md](UPGRADING.md)**.
 
 ## REST API
 

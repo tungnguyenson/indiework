@@ -5,7 +5,7 @@ import { ok, unauthorized, handleServiceError } from '@/lib/api-response';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
-  if (!requireBearer(req)) return unauthorized();
+  if (!(await requireBearer(req))) return unauthorized();
   try {
     return ok(await taskService.listInbox());
   } catch (e) {

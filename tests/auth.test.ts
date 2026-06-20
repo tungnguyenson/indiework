@@ -2,21 +2,32 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import {
   createSessionValue,
   verifySessionValue,
-  passwordMatches,
+  parseSessionValue,
   SESSION_MAX_AGE,
 } from '@/server/auth/session';
 import { bearerOk } from '@/server/auth/token';
+import { verifyPassword, hashPassword } from '@/server/auth/password';
 import { ServiceError } from '@/server/services';
 
-// requireSession reads the cookie jar via next/headers — mock it so we can drive
-// the guard with arbitrary cookie values.
-const cookieGet = vi.fn();
+const TEST_USER_ID = '550e8400-e29b-41d4-a716-446655440000';
+
+const { cookieGet, getById } = vi.hoisted(() => ({
+  cookieGet: vi.fn(),
+  getById: vi.fn(),
+}));
+
+// requireSession reads the cookie jar + userService — mock both.
 vi.mock('next/headers', () => ({
   cookies: () => Promise.resolve({ get: cookieGet }),
 }));
 
+vi.mock('@/server/services/user.service', () => ({
+  userService: { getById },
+}));
+
 /** Reproduce the session HMAC so we can forge an *expired-but-validly-signed* token. */
-async function signed(issued: string): Promise<string> {
+async function signed(userId: string, issued: string): Promise<string> {
+  const payload = `${userId}.${issued}`;
   const key = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(process.env.COOKIE_SECRET!),
@@ -24,15 +35,19 @@ async function signed(issued: string): Promise<string> {
     false,
     ['sign'],
   );
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(issued));
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
   let bin = '';
   for (const b of new Uint8Array(sig)) bin += String.fromCharCode(b);
-  return `${issued}.${btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
+  return `${payload}.${btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
 }
 
 describe('session cookie', () => {
-  test('a freshly minted value verifies', async () => {
-    expect(await verifySessionValue(await createSessionValue())).toBe(true);
+  test('a freshly minted value verifies and parses userId', async () => {
+    const value = await createSessionValue(TEST_USER_ID);
+    expect(await verifySessionValue(value)).toBe(true);
+    expect(await parseSessionValue(value)).toEqual(
+      expect.objectContaining({ userId: TEST_USER_ID }),
+    );
   });
 
   test('rejects empty / malformed values', async () => {
@@ -44,32 +59,33 @@ describe('session cookie', () => {
   });
 
   test('rejects a tampered signature', async () => {
-    const value = await createSessionValue();
-    const [issued] = value.split('.');
-    expect(await verifySessionValue(`${issued}.deadbeef`)).toBe(false);
+    const value = await createSessionValue(TEST_USER_ID);
+    const dot = value.lastIndexOf('.');
+    const rest = value.slice(0, dot);
+    expect(await verifySessionValue(`${rest}.deadbeef`)).toBe(false);
   });
 
   test('rejects a tampered issued-at (signature no longer matches)', async () => {
-    const value = await createSessionValue();
+    const value = await createSessionValue(TEST_USER_ID);
     const sig = value.slice(value.lastIndexOf('.') + 1);
-    expect(await verifySessionValue(`9999999999999.${sig}`)).toBe(false);
+    expect(await verifySessionValue(`${TEST_USER_ID}.9999999999999.${sig}`)).toBe(false);
   });
 
   test('rejects an expired but correctly-signed token', async () => {
     const old = String(Date.now() - (SESSION_MAX_AGE * 1000 + 60_000)); // 1 min past expiry
-    expect(await verifySessionValue(await signed(old))).toBe(false);
+    expect(await verifySessionValue(await signed(TEST_USER_ID, old))).toBe(false);
   });
 });
 
-describe('passwordMatches', () => {
-  test('true for the configured password, false otherwise', async () => {
-    expect(await passwordMatches(process.env.APP_PASSWORD!)).toBe(true);
-    expect(await passwordMatches(`${process.env.APP_PASSWORD!}x`)).toBe(false);
-    expect(await passwordMatches('')).toBe(false);
+describe('password hashing', () => {
+  test('verify succeeds for the correct password', async () => {
+    const hash = await hashPassword('secret');
+    expect(await verifyPassword('secret', hash)).toBe(true);
+    expect(await verifyPassword('wrong', hash)).toBe(false);
   });
 });
 
-describe('bearerOk', () => {
+describe('bearerOk (legacy static token)', () => {
   test('accepts the exact token, case-insensitive scheme', () => {
     expect(bearerOk(`Bearer ${process.env.API_TOKEN!}`)).toBe(true);
     expect(bearerOk(`bearer ${process.env.API_TOKEN!}`)).toBe(true);
@@ -84,16 +100,22 @@ describe('bearerOk', () => {
 });
 
 describe('requireSession (Server Action guard)', () => {
-  // Imported lazily so the next/headers mock is in place first.
   let requireSession: typeof import('@/server/auth/require-session').requireSession;
   beforeEach(async () => {
     cookieGet.mockReset();
+    getById.mockReset();
+    getById.mockResolvedValue({
+      id: TEST_USER_ID,
+      email: 'admin@example.com',
+      name: 'Admin',
+      role: 'admin',
+    });
     ({ requireSession } = await import('@/server/auth/require-session'));
   });
 
-  test('passes when a valid session cookie is present', async () => {
-    cookieGet.mockReturnValue({ value: await createSessionValue() });
-    await expect(requireSession()).resolves.toBeUndefined();
+  test('returns userId when a valid session cookie is present', async () => {
+    cookieGet.mockReturnValue({ value: await createSessionValue(TEST_USER_ID) });
+    await expect(requireSession()).resolves.toBe(TEST_USER_ID);
   });
 
   test('throws unauthorized when the cookie is absent', async () => {
@@ -106,6 +128,12 @@ describe('requireSession (Server Action guard)', () => {
 
   test('throws unauthorized when the cookie is invalid', async () => {
     cookieGet.mockReturnValue({ value: 'forged.value' });
+    await expect(requireSession()).rejects.toBeInstanceOf(ServiceError);
+  });
+
+  test('throws unauthorized when the user is disabled or missing', async () => {
+    cookieGet.mockReturnValue({ value: await createSessionValue(TEST_USER_ID) });
+    getById.mockResolvedValue(null);
     await expect(requireSession()).rejects.toBeInstanceOf(ServiceError);
   });
 });

@@ -9,8 +9,8 @@
  * columns/tables/indexes here in lockstep with ./schema.ts.
  *
  * Dialect mapping (vs ./schema.ts):
- *  - uuid PK / FK            → text + $defaultFn(randomUUID) so IDs/refs stay
- *                              identical uuid strings across both drivers
+ *  - uuid PK / FK            → text + $defaultFn(newUuid) so IDs/refs stay
+ *                              identical uuid v7 strings across both drivers
  *  - timestamptz             → integer { mode: 'timestamp' } (unixepoch())
  *  - boolean                 → integer { mode: 'boolean' }
  *  - text[] (tags)           → text { mode: 'json' } $type<string[]>
@@ -20,7 +20,7 @@
  * enforcement ON; libsql defaults it on and ./index.ts also sets the pragma.
  */
 
-import { randomUUID } from 'node:crypto';
+import { newUuid } from '@/lib/uuid';
 import { sql } from 'drizzle-orm';
 import {
   sqliteTable,
@@ -38,6 +38,7 @@ import {
   PROJECT_STATUS,
   COMMENT_SOURCE,
   API_KEY_SCOPE,
+  USER_ROLE,
   ATTACHMENT_TYPE,
   DEFAULT_TASK_STATUS,
   DEFAULT_TASK_PRIORITY,
@@ -46,11 +47,11 @@ import {
   DEFAULT_PROJECT_STATUS,
 } from '@/lib/domain';
 
-/** uuid-string PK, generated app-side so it matches the Postgres uuid columns. */
+/** uuid v7 string PK, generated app-side to match Postgres uuid columns. */
 const uuidPk = () =>
   text('id')
     .primaryKey()
-    .$defaultFn(() => randomUUID());
+    .$defaultFn(() => newUuid());
 
 const timestamps = {
   createdAt: integer('created_at', { mode: 'timestamp' })
@@ -60,6 +61,21 @@ const timestamps = {
     .notNull()
     .default(sql`(unixepoch())`),
 };
+
+// ---- users (identity for admin + agent attribution) ----
+export const users = sqliteTable(
+  'users',
+  {
+    id: uuidPk(),
+    email: text('email'), // required for admin; NULL for agents (passwordless, identified by name + api_key)
+    name: text('name').notNull(),
+    role: text('role', { enum: USER_ROLE }).notNull(),
+    passwordHash: text('password_hash'), // NULL for agents
+    disabledAt: integer('disabled_at', { mode: 'timestamp' }),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex('users_email_unique').on(t.email)],
+);
 
 // ---- workspaces (top-level container above projects) ----
 export const workspaces = sqliteTable('workspaces', {
@@ -180,6 +196,7 @@ export const tasks = sqliteTable(
     position: integer('position').notNull().default(0),
     dueDate: integer('due_date', { mode: 'timestamp' }),
     completedAt: integer('completed_at', { mode: 'timestamp' }), // set on → done
+    createdById: text('created_by_id').references(() => users.id, { onDelete: 'set null' }),
     ...timestamps,
   },
   (t) => [
@@ -222,6 +239,7 @@ export const comments = sqliteTable(
       .references(() => tasks.id, { onDelete: 'cascade' }),
     body: text('body').notNull(), // markdown
     source: text('source', { enum: COMMENT_SOURCE }).notNull().default('web'),
+    createdById: text('created_by_id').references(() => users.id, { onDelete: 'set null' }),
     createdAt: integer('created_at', { mode: 'timestamp' })
       .notNull()
       .default(sql`(unixepoch())`),
@@ -233,6 +251,7 @@ export const comments = sqliteTable(
 // ---- api_keys (managed, scoped tokens — built in Phase 4, table reserved) ----
 export const apiKeys = sqliteTable('api_keys', {
   id: uuidPk(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   prefix: text('prefix').notNull().default('iw_live_'),
   hash: text('hash').notNull(), // sha-256 of the secret; shown once on create

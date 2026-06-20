@@ -17,7 +17,9 @@ const schema = z
       .url('DATABASE_URL must be a valid postgres connection string')
       .optional(),
     SQLITE_PATH: z.string().min(1).optional(),
-    APP_PASSWORD: z.string().min(1, 'APP_PASSWORD is required (the web login password)'),
+    APP_PASSWORD: z.string().min(1).optional(), // deprecated — kept for docs/back-compat only
+    ADMIN_EMAIL: z.string().email('ADMIN_EMAIL must be a valid email'),
+    ADMIN_PASSWORD: z.string().min(1, 'ADMIN_PASSWORD is required (the web login password)'),
     COOKIE_SECRET: z
       .string()
       .min(32, 'COOKIE_SECRET must be at least 32 chars (used to sign the session cookie)'),

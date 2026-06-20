@@ -11,8 +11,8 @@ function refresh() {
 }
 
 export async function createTask(input: CreateTaskInput) {
-  await requireSession();
-  const task = await taskService.create(input);
+  const userId = await requireSession();
+  const task = await taskService.create(input, userId);
   refresh();
   return task;
 }
@@ -32,8 +32,8 @@ export async function toggleTaskDone(id: string) {
 }
 
 export async function addSubtask(parentId: string, title: string) {
-  await requireSession();
-  const task = await taskService.addSubtask(parentId, title);
+  const userId = await requireSession();
+  const task = await taskService.addSubtask(parentId, title, undefined, userId);
   refresh();
   return task;
 }
@@ -77,8 +77,8 @@ export async function bulkDeleteTasks(ids: string[]) {
 }
 
 export async function addTaskComment(taskId: string, body: string) {
-  await requireSession();
-  const comment = await commentService.add({ taskId, body }, 'web');
+  const userId = await requireSession();
+  const comment = await commentService.add({ taskId, body }, 'web', userId);
   refresh();
   return comment;
 }

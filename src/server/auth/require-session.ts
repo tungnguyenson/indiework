@@ -7,13 +7,26 @@
  * re-verify the session itself. Call `requireSession()` as the FIRST line.
  */
 import { cookies } from 'next/headers';
-import { SESSION_COOKIE, verifySessionValue } from '@/server/auth/session';
+import { SESSION_COOKIE, parseSessionValue } from '@/server/auth/session';
+import { userService } from '@/server/services/user.service';
 import { unauthorized } from '@/server/services/errors';
 
-/** Throw unless the caller presents a valid, unexpired session cookie. */
-export async function requireSession(): Promise<void> {
+/** Throw unless the caller presents a valid, unexpired session cookie. Returns userId. */
+export async function requireSession(): Promise<string> {
   const value = (await cookies()).get(SESSION_COOKIE)?.value;
-  if (!(await verifySessionValue(value))) {
-    throw unauthorized();
-  }
+  const parsed = await parseSessionValue(value);
+  if (!parsed) throw unauthorized();
+
+  const user = await userService.getById(parsed.userId);
+  if (!user) throw unauthorized();
+
+  return parsed.userId;
+}
+
+/** Load the current session user (role looked up server-side, not from cookie). */
+export async function getCurrentUser() {
+  const userId = await requireSession();
+  const user = await userService.getById(userId);
+  if (!user) throw unauthorized();
+  return user;
 }

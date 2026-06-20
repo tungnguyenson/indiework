@@ -14,7 +14,7 @@ export const commentService = {
   },
 
   /** Append a comment to a task's timeline. `source` records where it came from. */
-  async add(input: unknown, defaultSource: CommentSource = 'web') {
+  async add(input: unknown, defaultSource: CommentSource = 'web', createdById?: string | null) {
     const data = addCommentSchema.parse(input);
 
     const [task] = await db
@@ -26,7 +26,12 @@ export const commentService = {
 
     const [row] = await db
       .insert(schema.comments)
-      .values({ taskId: data.taskId, body: data.body, source: data.source ?? defaultSource })
+      .values({
+        taskId: data.taskId,
+        body: data.body,
+        source: data.source ?? defaultSource,
+        createdById: createdById ?? null,
+      })
       .returning();
     return row;
   },

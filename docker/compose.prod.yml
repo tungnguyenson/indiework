@@ -15,7 +15,8 @@
 # Secrets live in `.env` / `.env.demo` next to this file (NOT in git). See
 # docs/infra/deploy-vps.md. Required keys (each file):
 #   DATABASE_URL   postgres://indiework:...@host.docker.internal:5432/indiework[_demo]
-#   APP_PASSWORD   the web login password
+#   ADMIN_EMAIL    admin login email (seeded on first boot)
+#   ADMIN_PASSWORD the web login password
 #   COOKIE_SECRET  >= 32 chars, signs the session cookie (DIFFERENT per instance)
 #   API_TOKEN      Bearer token for REST + MCP
 services:

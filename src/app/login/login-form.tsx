@@ -9,11 +9,13 @@ const initial: LoginState = { error: null };
 
 interface LoginFormProps {
   next: string;
-  /** When set, this is the public demo: show + prefill the throwaway password. */
+  /** When set, this is the public demo: show + prefill the throwaway credentials. */
   demoHint?: string;
+  /** Demo admin email — prefilled when demoHint is set. */
+  demoEmail?: string;
 }
 
-export function LoginForm({ next, demoHint }: LoginFormProps) {
+export function LoginForm({ next, demoHint, demoEmail }: LoginFormProps) {
   const [state, formAction, pending] = useActionState(login, initial);
 
   return (
@@ -28,26 +30,38 @@ export function LoginForm({ next, demoHint }: LoginFormProps) {
         <p>
           {demoHint
             ? 'Live demo with sample data. Play freely — it resets on a schedule.'
-            : 'Just you. Enter your password to open the workspace.'}
+            : 'Sign in with your admin email and password.'}
         </p>
 
         {demoHint && (
           <div className="login-demo">
-            <Ic.lock size={13} /> Demo password: <b>{demoHint}</b> (already filled in)
+            <Ic.lock size={13} /> Demo: <b>{demoEmail ?? 'demo@demo.local'}</b> / <b>{demoHint}</b>
           </div>
         )}
 
         <form action={formAction}>
           <input type="hidden" name="next" value={next} />
+          <div className="login-field" style={{ marginBottom: 8 }}>
+            <input
+              type="email"
+              name="email"
+              placeholder="Email"
+              defaultValue={demoEmail}
+              autoFocus
+              autoComplete="username"
+              aria-label="Email"
+              required
+            />
+          </div>
           <div className="login-field">
             <input
               type="password"
               name="password"
               placeholder="Password"
               defaultValue={demoHint}
-              autoFocus
               autoComplete="current-password"
               aria-label="Password"
+              required
             />
             <button className="login-go" type="submit" disabled={pending} aria-label="Unlock">
               <Ic.arrowRight size={20} />
@@ -56,7 +70,9 @@ export function LoginForm({ next, demoHint }: LoginFormProps) {
           {state.error && <p className="login-err">{state.error}</p>}
         </form>
 
-        <p className="login-hint">No sign-up · no recovery · no accounts. Just a lock.</p>
+        <p className="login-hint">
+          {demoHint ? 'Public demo — no private data here.' : 'Single admin account · seeded from your .env'}
+        </p>
       </div>
     </main>
   );

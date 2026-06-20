@@ -10,6 +10,7 @@ const PREFIX = 'iw_live_';
 const createApiKeySchema = z.object({
   name: z.string().trim().min(1, 'name is required').max(80),
   scope: z.enum(API_KEY_SCOPE).optional(),
+  userId: z.string().uuid().optional(),
 });
 
 function sha256(s: string): string {
@@ -47,6 +48,7 @@ export const apiKeyService = {
       .insert(schema.apiKeys)
       .values({
         name: data.name,
+        userId: data.userId ?? null,
         prefix: PREFIX,
         hash: sha256(full),
         tail,
@@ -62,19 +64,43 @@ export const apiKeyService = {
     return { ok: true };
   },
 
-  /** Verify a presented secret against stored hashes (for future Bearer use). */
-  async verify(fullToken: string): Promise<boolean> {
+  /** Verify a presented secret and return the owning agent's userId. */
+  async resolveUser(fullToken: string): Promise<string | null> {
     const hash = sha256(fullToken);
     const [row] = await db
-      .select({ id: schema.apiKeys.id })
+      .select({ id: schema.apiKeys.id, userId: schema.apiKeys.userId })
       .from(schema.apiKeys)
       .where(eq(schema.apiKeys.hash, hash))
       .limit(1);
-    if (!row) return false;
+    if (!row?.userId) return null;
     await db
       .update(schema.apiKeys)
       .set({ lastUsedAt: new Date() })
       .where(eq(schema.apiKeys.id, row.id));
-    return true;
+    return row.userId;
+  },
+
+  /**
+   * Idempotent: ensure an api_key row exists for the legacy static API_TOKEN,
+   * owned by the default-agent user.
+   */
+  async ensureLegacyToken(apiToken: string, userId: string): Promise<void> {
+    const hash = sha256(apiToken);
+    const [existing] = await db
+      .select({ id: schema.apiKeys.id })
+      .from(schema.apiKeys)
+      .where(eq(schema.apiKeys.hash, hash))
+      .limit(1);
+    if (existing) return;
+
+    const tail = apiToken.slice(-4);
+    await db.insert(schema.apiKeys).values({
+      name: 'legacy API_TOKEN',
+      userId,
+      prefix: '',
+      hash,
+      tail,
+      scope: 'read-write',
+    });
   },
 };

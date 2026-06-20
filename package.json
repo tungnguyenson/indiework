@@ -11,10 +11,12 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --env-file=.env --import tsx src/server/db/migrate.ts",
     "db:seed": "node --env-file=.env --import tsx src/server/db/seed.ts",
+    "db:reset-admin-password": "node --env-file=.env --import tsx src/server/db/reset-admin-password.ts",
     "db:seed:sample": "node --env-file=.env --import tsx src/server/db/seed-sample.ts",
     "db:studio": "node --env-file=.env node_modules/drizzle-kit/bin.cjs studio",
     "db:push:sqlite": "drizzle-kit push --config=drizzle.sqlite.config.ts",
     "db:seed:sqlite": "DB_DRIVER=sqlite node --env-file=.env --import tsx src/server/db/seed.ts",
+    "db:reset-admin-password:sqlite": "DB_DRIVER=sqlite node --env-file=.env --import tsx src/server/db/reset-admin-password.ts",
     "db:seed:sample:sqlite": "DB_DRIVER=sqlite node --env-file=.env --import tsx src/server/db/seed-sample.ts",
     "db:studio:sqlite": "node node_modules/drizzle-kit/bin.cjs studio --config=drizzle.sqlite.config.ts",
     "test": "vitest run",
@@ -36,6 +38,7 @@
     "react-dom": "19.2.4",
     "server-only": "^0.0.1",
     "tiptap-markdown": "^0.9.0",
+    "uuid": "^14.0.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
