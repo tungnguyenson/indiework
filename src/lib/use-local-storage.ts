@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 /**
  * SSR-safe localStorage state. Renders `initial` on the server and the first
@@ -9,18 +9,21 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  */
 export function useLocalStorage<T>(key: string, initial: T): [T, (v: T | ((prev: T) => T)) => void] {
   const [value, setValue] = useState<T>(initial);
-  const initialRef = useRef(initial);
-  initialRef.current = initial;
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(key);
-      if (raw != null) setValue(JSON.parse(raw) as T);
-      else setValue(initialRef.current);
+      if (raw != null) {
+        setValue(JSON.parse(raw) as T);
+        return;
+      }
     } catch {
-      setValue(initialRef.current);
+      // fall through to initial
     }
-    // re-read when the key changes (e.g. switching projects or views)
+    // `initial` is read from the render when `key` changed; omit from deps so a
+    // new default object identity (e.g. availDims loading) doesn't wipe saved prefs.
+    setValue(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync storage when key changes only
   }, [key]);
 
   const set = useCallback(

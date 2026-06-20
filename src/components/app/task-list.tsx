@@ -204,7 +204,7 @@ export function ProjectView({
       });
       lastSel.current = id;
     },
-    [orderedIds],
+    [orderedIds, setSelected],
   );
 
   const toggleCollapse = (key: string) =>
