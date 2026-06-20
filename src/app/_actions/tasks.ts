@@ -5,6 +5,8 @@ import { taskService, commentService, attachmentService } from '@/server/service
 import { requireSession } from '@/server/auth/require-session';
 import type { CreateTaskInput, UpdateTaskInput } from '@/server/validators/task';
 import type { CreateAttachmentInput } from '@/server/validators/attachment';
+import { MAX_ATTACHMENT_BYTES } from '@/server/attachment-limits';
+import { badRequest } from '@/server/services/errors';
 
 function refresh() {
   revalidatePath('/app', 'layout');
@@ -90,10 +92,28 @@ export async function editTaskComment(commentId: string, body: string) {
   return comment;
 }
 
-// ---- attachments (metadata only; file storage is deferred — see Phase 7) ----
+// ---- attachments ----
 export async function addAttachment(input: CreateAttachmentInput) {
   await requireSession();
   const att = await attachmentService.add(input);
+  refresh();
+  return att;
+}
+
+export async function uploadAttachment(taskId: string, formData: FormData) {
+  await requireSession();
+  const file = formData.get('file');
+  if (!(file instanceof File)) throw badRequest('file is required');
+  if (file.size > MAX_ATTACHMENT_BYTES) {
+    throw badRequest(`File exceeds the ${MAX_ATTACHMENT_BYTES} byte limit`);
+  }
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const att = await attachmentService.upload({
+    taskId,
+    name: file.name,
+    bytes,
+    contentType: file.type || 'application/octet-stream',
+  });
   refresh();
   return att;
 }

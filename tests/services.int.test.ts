@@ -192,14 +192,22 @@ describe('service slice (real Postgres)', () => {
     expect(mod.description).toBe('DMG + updates');
   });
 
-  test('attachments: add, list, count on the task DTO, remove', async () => {
+  test('attachments: upload, list, count on the task DTO, download, remove', async () => {
     const t = await taskService.create({ projectId, title: 'Has files' });
     await attachmentService.add({ taskId: t.id, name: 'a.csv', type: 'file', size: '1 KB', ext: 'csv' });
-    const img = await attachmentService.add({ taskId: t.id, name: 'b.png', type: 'image', size: '2 KB', ext: 'png' });
-    expect(img.path).toBeNull(); // storage deferred — metadata only
+    const img = await attachmentService.upload({
+      taskId: t.id,
+      name: 'b.png',
+      bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
+      contentType: 'image/png',
+    });
+    expect(img.path).toBe(`attachments/${img.id}`);
 
     const list = await attachmentService.list(t.id);
     expect(list).toHaveLength(2);
+
+    const opened = await attachmentService.open(img.id);
+    expect(opened.body.byteLength).toBe(4);
 
     const fromList = (await taskService.list({ projectId })).find((x) => x.id === t.id);
     expect(fromList?.attachmentCount).toBe(2);

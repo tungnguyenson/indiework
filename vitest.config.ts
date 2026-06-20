@@ -11,6 +11,8 @@ try {
 // Test defaults for vars added after older .env files were created.
 process.env.ADMIN_EMAIL ??= 'test@example.com';
 process.env.ADMIN_PASSWORD ??= process.env.APP_PASSWORD ?? 'test-password';
+process.env.COOKIE_SECRET ??= 'test-cookie-secret-at-least-32-characters-long';
+process.env.API_TOKEN ??= 'test-api-token';
 
 export default defineConfig({
   plugins: [tsconfigPaths()],

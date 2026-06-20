@@ -25,6 +25,11 @@ const schema = z
       .min(32, 'COOKIE_SECRET must be at least 32 chars (used to sign the session cookie)'),
     API_TOKEN: z.string().min(1, 'API_TOKEN is required (Bearer token for REST + MCP)'),
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+    // Cloudflare R2 (S3-compatible). All four required together in production uploads.
+    R2_ACCOUNT_ID: z.string().min(1).optional(),
+    R2_ACCESS_KEY_ID: z.string().min(1).optional(),
+    R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    R2_BUCKET: z.string().min(1).optional(),
   })
   .superRefine((val, ctx) => {
     if (val.DB_DRIVER === 'postgres' && !val.DATABASE_URL) {
@@ -32,6 +37,16 @@ const schema = z
         code: z.ZodIssueCode.custom,
         path: ['DATABASE_URL'],
         message: 'DATABASE_URL is required when DB_DRIVER=postgres',
+      });
+    }
+    const r2 = [val.R2_ACCOUNT_ID, val.R2_ACCESS_KEY_ID, val.R2_SECRET_ACCESS_KEY, val.R2_BUCKET];
+    const anyR2 = r2.some(Boolean);
+    const allR2 = r2.every(Boolean);
+    if (anyR2 && !allR2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['R2_ACCOUNT_ID'],
+        message: 'R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET must all be set together',
       });
     }
   });
@@ -43,4 +58,12 @@ if (!parsed.success) {
   throw new Error(`Invalid environment configuration:\n${issues}`);
 }
 
-export const env = parsed.data;
+const data = parsed.data;
+
+export const env = {
+  ...data,
+  /** True when all R2 credentials are present — use R2 instead of the in-memory fallback. */
+  R2_CONFIGURED: Boolean(
+    data.R2_ACCOUNT_ID && data.R2_ACCESS_KEY_ID && data.R2_SECRET_ACCESS_KEY && data.R2_BUCKET,
+  ),
+};
