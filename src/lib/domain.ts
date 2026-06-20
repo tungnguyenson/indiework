@@ -46,8 +46,22 @@ export const COMMENT_SOURCE = [
 
 export const API_KEY_SCOPE = ['read', 'write', 'read-write'] as const;
 
-/** User role — display label only; not enforced as RBAC in the indie app. */
-export const USER_ROLE = ['admin', 'agent'] as const;
+/**
+ * Account type (identity) — what KIND of user this is, not what they can do.
+ * `human` logs in with email/password; `agent` is a machine account for MCP/API
+ * (passwordless). Authorization (owner/admin/member/viewer) lives on
+ * `workspace_members.role`, NOT here — see docs/pivot/authorization-design.md §3.
+ */
+export const USER_ROLE = ['human', 'agent'] as const;
+
+/** Authorization role inside one workspace (RBAC). Lives on `workspace_members`. */
+export const WORKSPACE_ROLE = ['owner', 'admin', 'member', 'viewer'] as const;
+
+/** Membership lifecycle. Only `active` members can read/write workspace data. */
+export const MEMBER_STATUS = ['active', 'invited', 'suspended'] as const;
+
+/** Capability tier of a workspace — `team` unlocks collaborative features. */
+export const WORKSPACE_PLAN = ['solo', 'team'] as const;
 
 /** Attachment kind — drives thumbnail vs file-tile rendering (v3). */
 export const ATTACHMENT_TYPE = ['file', 'image'] as const;
@@ -106,6 +120,9 @@ export type ProjectStatus = (typeof PROJECT_STATUS)[number];
 export type CommentSource = (typeof COMMENT_SOURCE)[number];
 export type ApiKeyScope = (typeof API_KEY_SCOPE)[number];
 export type UserRole = (typeof USER_ROLE)[number];
+export type WorkspaceRole = (typeof WORKSPACE_ROLE)[number];
+export type MemberStatus = (typeof MEMBER_STATUS)[number];
+export type WorkspacePlan = (typeof WORKSPACE_PLAN)[number];
 export type AttachmentType = (typeof ATTACHMENT_TYPE)[number];
 
 // ---- Defaults ----

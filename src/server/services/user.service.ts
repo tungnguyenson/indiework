@@ -50,7 +50,8 @@ export const userService = {
 
   async verifyLogin(email: string, password: string): Promise<UserPublic | null> {
     const row = await this.getByEmail(email);
-    if (!row || row.disabledAt || row.role !== 'admin' || !row.passwordHash) return null;
+    // Only human accounts log in with a password (agents are passwordless).
+    if (!row || row.disabledAt || row.role !== 'human' || !row.passwordHash) return null;
     if (!(await verifyPassword(password, row.passwordHash))) return null;
     return toPublic(row);
   },
@@ -67,7 +68,7 @@ export const userService = {
       .values({
         email: normalized,
         name: 'Admin',
-        role: 'admin',
+        role: 'human',
         passwordHash,
       })
       .returning({ id: schema.users.id });
@@ -84,7 +85,7 @@ export const userService = {
     const [row] = await db
       .update(schema.users)
       .set({ passwordHash, updatedAt: new Date() })
-      .where(and(eq(schema.users.email, normalized), eq(schema.users.role, 'admin')))
+      .where(and(eq(schema.users.email, normalized), eq(schema.users.role, 'human')))
       .returning({ id: schema.users.id });
     if (!row) throw notFound(`admin with email ${normalized}`);
   },
@@ -110,12 +111,12 @@ export const userService = {
     return row.id;
   },
 
-  /** Return the first active admin (for backfill). */
+  /** Return the first active human user (for backfill). */
   async getFirstAdminId(): Promise<string | null> {
     const [row] = await db
       .select({ id: schema.users.id })
       .from(schema.users)
-      .where(eq(schema.users.role, 'admin'))
+      .where(eq(schema.users.role, 'human'))
       .limit(1);
     return row?.id ?? null;
   },

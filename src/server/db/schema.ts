@@ -29,6 +29,9 @@ import {
   COMMENT_SOURCE,
   API_KEY_SCOPE,
   USER_ROLE,
+  WORKSPACE_ROLE,
+  MEMBER_STATUS,
+  WORKSPACE_PLAN,
   ATTACHMENT_TYPE,
   DEFAULT_TASK_STATUS,
   DEFAULT_TASK_PRIORITY,
@@ -61,14 +64,41 @@ export const users = pgTable(
   (t) => [uniqueIndex('users_email_unique').on(t.email)],
 );
 
-// ---- workspaces (top-level container above projects) ----
+// ---- workspaces (top-level container above projects = the tenant) ----
 export const workspaces = pgTable('workspaces', {
   id: uuidPk(),
   name: text('name').notNull(),
   emoji: text('emoji'),
   tagline: text('tagline'),
+  // Capability tier: 'solo' (default) or 'team'. Flips collab features on/off.
+  plan: text('plan', { enum: WORKSPACE_PLAN }).notNull().default('solo'),
+  // Optional cap on active members (team tier billing); NULL = no cap.
+  seatLimit: integer('seat_limit'),
   ...timestamps,
 });
+
+// ---- workspace_members (user × workspace → role = the tenant boundary) ----
+export const workspaceMembers = pgTable(
+  'workspace_members',
+  {
+    id: uuidPk(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    role: text('role', { enum: WORKSPACE_ROLE }).notNull(), // owner | admin | member | viewer
+    status: text('status', { enum: MEMBER_STATUS }).notNull().default('active'),
+    invitedBy: uuid('invited_by').references(() => users.id, { onDelete: 'set null' }),
+    joinedAt: timestamp('joined_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('ws_members_unique').on(t.workspaceId, t.userId), // 1 role / user / workspace
+    index('ws_members_user_idx').on(t.userId),
+  ],
+);
 
 // ---- projects ----
 export const projects = pgTable(
@@ -94,7 +124,8 @@ export const projects = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex('projects_key_unique').on(t.key),
+    // Multi-tenant: a KEY is unique WITHIN a workspace, not globally.
+    uniqueIndex('projects_workspace_key_unique').on(t.workspaceId, t.key),
     index('projects_workspace_idx').on(t.workspaceId),
   ],
 );
@@ -181,6 +212,13 @@ export const tasks = pgTable(
     dueDate: timestamp('due_date', { withTimezone: true }),
     completedAt: timestamp('completed_at', { withTimezone: true }), // set on → done
     createdById: uuid('created_by_id').references(() => users.id, { onDelete: 'set null' }),
+    assigneeId: uuid('assignee_id').references(() => users.id, { onDelete: 'set null' }),
+    // Tenant scope. Every task — incl. Inbox (projectId null) — is scoped here.
+    // NULLABLE in Inc 1 (column added before ctx stamps it); tightened to
+    // NOT NULL in Inc 3. See docs/pivot/p1-implementation-notes.md.
+    workspaceId: uuid('workspace_id').references(() => workspaces.id, {
+      onDelete: 'cascade',
+    }),
     ...timestamps,
   },
   (t) => [
@@ -189,6 +227,8 @@ export const tasks = pgTable(
     index('tasks_module_idx').on(t.moduleId),
     index('tasks_milestone_idx').on(t.milestoneId),
     index('tasks_parent_idx').on(t.parentId),
+    index('tasks_assignee_idx').on(t.assigneeId),
+    index('tasks_workspace_idx').on(t.workspaceId),
   ],
 );
 
@@ -232,6 +272,11 @@ export const comments = pgTable(
 export const apiKeys = pgTable('api_keys', {
   id: uuidPk(),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  // The workspace a key is bound to — the bearer Ctx resolver reads this.
+  // NULL falls back to the default workspace (legacy keys).
+  workspaceId: uuid('workspace_id').references(() => workspaces.id, {
+    onDelete: 'cascade',
+  }),
   name: text('name').notNull(),
   prefix: text('prefix').notNull().default('iw_live_'),
   hash: text('hash').notNull(), // sha-256 of the secret; shown once on create

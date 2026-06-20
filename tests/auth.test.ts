@@ -108,7 +108,7 @@ describe('requireSession (Server Action guard)', () => {
       id: TEST_USER_ID,
       email: 'admin@example.com',
       name: 'Admin',
-      role: 'admin',
+      role: 'human',
     });
     ({ requireSession } = await import('@/server/auth/require-session'));
   });
