@@ -14,11 +14,7 @@ import {
   LOGIN_CONSTANT_DELAY_MS,
 } from '@/server/auth/rate-limit';
 import { userService } from '@/server/services/user.service';
-
-/** Only allow redirecting back into the app, never to an external URL. */
-function safeNext(next: string): string {
-  return next.startsWith('/app') ? next : '/app';
-}
+import { safeNext } from '@/server/auth/safe-next';
 
 export type LoginState = { error: string | null };
 
