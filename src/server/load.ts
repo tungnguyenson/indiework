@@ -8,11 +8,13 @@ import {
   milestoneService,
   taskService,
 } from '@/server/services';
+import { requireSession } from '@/server/auth/require-session';
 import { resolveActiveWorkspace } from '@/server/active-workspace';
 import { assembleTaskDetail, type TaskDetail } from '@/server/task-detail';
 
 export async function loadShell() {
-  const { workspaces, active, isDefault } = await resolveActiveWorkspace();
+  const userId = await requireSession();
+  const { workspaces, active, isDefault } = await resolveActiveWorkspace(userId);
   const [projects, inbox] = await Promise.all([
     projectService.list({ workspaceId: active?.id ?? null, includeNullWorkspace: isDefault }),
     taskService.listInbox(),

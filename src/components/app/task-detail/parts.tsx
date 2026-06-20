@@ -9,7 +9,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { TaskDto } from '@/server/services';
 import type { TaskDetail } from '@/app/_actions/queries';
-import { addAttachment, removeAttachment } from '@/app/_actions/tasks';
+import { uploadAttachment, removeAttachment } from '@/app/_actions/tasks';
 import { commitOnEnter } from '@/lib/inline-edit';
 import { CircleCheck } from '@/components/ui/interactive';
 import { Ic } from '@/components/ui/icons';
@@ -111,15 +111,6 @@ export function SubRow({
   );
 }
 
-function humanSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
-function extOf(name: string): string {
-  const i = name.lastIndexOf('.');
-  return i > 0 ? name.slice(i + 1).toLowerCase() : '';
-}
 /** Deterministic per-extension hue so a set of files reads as a set. */
 function extHue(ext: string): number {
   let h = 0;
@@ -129,28 +120,30 @@ function extHue(ext: string): number {
 
 type AttachmentItem = TaskDetail['attachments'][number];
 
-/**
- * Attachments section. Files + images on a task. NOTE: byte storage is deferred —
- * adding a file persists its metadata only (name/type/size/ext); there is no
- * download target yet. See docs/v3-implementation-plan.md §Phase 7.
- */
+function attachmentDownloadUrl(id: string): string {
+  return `/api/v1/attachments/${id}/download`;
+}
+
+/** Attachments section — uploads go to R2 (or in-memory storage in tests). */
 export function Attachments({ taskId, items, onChanged }: { taskId: string; items: AttachmentItem[]; onChanged: () => Promise<void> }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const addFiles = async (files: FileList | null) => {
-    if (!files?.length) return;
-    for (const f of Array.from(files)) {
-      const ext = extOf(f.name);
-      await addAttachment({
-        taskId,
-        name: f.name,
-        type: f.type.startsWith('image/') ? 'image' : 'file',
-        size: humanSize(f.size),
-        ext: ext || null,
-      });
+    if (!files?.length || uploading) return;
+    setUploading(true);
+    try {
+      for (const f of Array.from(files)) {
+        const fd = new FormData();
+        fd.set('file', f);
+        await uploadAttachment(taskId, fd);
+      }
+      await onChanged();
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = '';
     }
-    await onChanged();
   };
 
   return (
@@ -167,6 +160,8 @@ export function Attachments({ taskId, items, onChanged }: { taskId: string; item
 
       {items.map((a) => {
         const hue = extHue(a.ext ?? a.name);
+        const hasFile = Boolean(a.path);
+        const downloadUrl = hasFile ? attachmentDownloadUrl(a.id) : undefined;
         return (
           <div className="attach-item" key={a.id}>
             <span
@@ -174,7 +169,14 @@ export function Attachments({ taskId, items, onChanged }: { taskId: string; item
               data-image={a.type === 'image' ? '' : undefined}
               style={{ '--att-hue': hue } as React.CSSProperties}
             >
-              {a.type === 'image' ? <Ic.image size={16} /> : <Ic.fileText size={16} />}
+              {a.type === 'image' && downloadUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- same-origin authenticated download URL
+                <img src={downloadUrl} alt="" className="attach-thumb" />
+              ) : a.type === 'image' ? (
+                <Ic.image size={16} />
+              ) : (
+                <Ic.fileText size={16} />
+              )}
             </span>
             <div className="attach-body">
               <span className="attach-name">{a.name}</span>
@@ -182,9 +184,15 @@ export function Attachments({ taskId, items, onChanged }: { taskId: string; item
                 {(a.ext || a.type).toUpperCase()} · {a.size ?? '—'}
               </span>
             </div>
-            <button className="attach-act" type="button" title="Download (storage pending)" disabled>
-              <Ic.download size={15} />
-            </button>
+            {downloadUrl ? (
+              <a className="attach-act" href={downloadUrl} download={a.name} title="Download">
+                <Ic.download size={15} />
+              </a>
+            ) : (
+              <button className="attach-act" type="button" title="Download unavailable" disabled>
+                <Ic.download size={15} />
+              </button>
+            )}
             <button
               className="attach-act"
               type="button"
@@ -219,7 +227,11 @@ export function Attachments({ taskId, items, onChanged }: { taskId: string; item
       >
         <Ic.paperclip size={15} />
         <span>
-          Drag files here or <b>browse</b>
+          {uploading ? 'Uploading…' : (
+            <>
+              Drag files here or <b>browse</b>
+            </>
+          )}
         </span>
       </div>
       <input ref={inputRef} type="file" multiple hidden onChange={(e) => addFiles(e.target.files)} />

@@ -7,7 +7,7 @@ import {
 } from '@/server/auth/session';
 import { bearerOk } from '@/server/auth/token';
 import { verifyPassword, hashPassword } from '@/server/auth/password';
-import { ServiceError } from '@/server/services';
+import { ServiceError } from '@/server/services/errors';
 
 const TEST_USER_ID = '550e8400-e29b-41d4-a716-446655440000';
 
@@ -108,7 +108,7 @@ describe('requireSession (Server Action guard)', () => {
       id: TEST_USER_ID,
       email: 'admin@example.com',
       name: 'Admin',
-      role: 'admin',
+      role: 'human',
     });
     ({ requireSession } = await import('@/server/auth/require-session'));
   });

@@ -7,5 +7,6 @@ export { commentService } from './comment.service';
 export { attachmentService, type AttachmentRow } from './attachment.service';
 export { apiKeyService, type ApiKeyPublic } from './apikey.service';
 export { userService } from './user.service';
+export { memberService } from './member.service';
 export { ServiceError } from './errors';
 export type { TaskDto } from './dto';

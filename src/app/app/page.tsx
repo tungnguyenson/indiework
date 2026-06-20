@@ -1,11 +1,13 @@
 import { redirect } from 'next/navigation';
 import { projectService } from '@/server/services';
+import { requireSession } from '@/server/auth/require-session';
 import { resolveActiveWorkspace } from '@/server/active-workspace';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AppHome() {
-  const { active, isDefault } = await resolveActiveWorkspace();
+  const userId = await requireSession();
+  const { active, isDefault } = await resolveActiveWorkspace(userId);
   const projects = await projectService.list({
     workspaceId: active?.id ?? null,
     includeNullWorkspace: isDefault,

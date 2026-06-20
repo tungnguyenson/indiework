@@ -36,6 +36,13 @@
       "when": 1781939815209,
       "tag": "0004_uuid_v7_defaults",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782000000001,
+      "tag": "0005_handy_swarm",
+      "breakpoints": true
     }
   ]
 }
