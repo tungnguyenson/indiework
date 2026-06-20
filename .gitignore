@@ -56,3 +56,4 @@ ds-bundle
 data
 
 .claude/worktrees/*
+.cursor
