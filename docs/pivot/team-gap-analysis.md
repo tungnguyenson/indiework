@@ -4,13 +4,17 @@
 >
 > This is not a feature list — it is a map of the **identity / tenancy / authorization backbone that does not exist today**. Collaboration features (assignee, mentions, notifications) sit *on top* of that backbone and are cheap by comparison.
 >
-> Companion to [../scope.md](../scope.md) (single-user source of truth) and [../roadmap.md](../roadmap.md). Status: **analysis / not yet decided**.
+> Companion to [../scope.md](../scope.md) (single-user source of truth) and [../roadmap.md](../roadmap.md).
+>
+> **Status: decided — Path 1, and the identity foundation is built.** This doc now reads as the *original* gap map; §1 below is the **historical starting point**, not the current state. For where the code is *now* and the locked plan, see **[team-implementation-plan.md](team-implementation-plan.md)** (Path 1: one multi-tenant platform, team = a workspace capability tier). Items already shipped are annotated ✅ inline.
 
 ---
 
-## 1. Starting point — the app is single-user by design
+## 1. Starting point — the app *was* single-user by design (historical)
 
-The code states this explicitly; the gap is structural, not cosmetic.
+> ⚠️ **Superseded.** This was true at the start. Since then the identity layer has been built the Path-1 way — real `users`, email/password, `userId` in the session, attribution. The table below is kept as the baseline we moved from; see [team-implementation-plan.md §2](team-implementation-plan.md) for current state.
+
+The code stated this explicitly; the gap was structural, not cosmetic.
 
 | Fact | Evidence |
 |---|---|
@@ -28,14 +32,14 @@ The code states this explicitly; the gap is structural, not cosmetic.
 
 ### P0 — Backbone (nothing collaborative is safe without these)
 
-#### 2.1 Identity & authentication
-| Today | Team needs |
+#### 2.1 Identity & authentication — ✅ mostly built
+| Need | Status |
 |---|---|
-| No `users` | `users` (email, name, avatar, `password_hash` / OAuth identity, timestamps) |
-| One shared `APP_PASSWORD` | Real auth (email+password, OAuth/SSO, or magic link); **session must carry `userId`** |
-| Cookie = "authenticated" only | Session/token bound to (user, workspace) context |
-| No account lifecycle | Sign-up, email verification, password reset, onboarding |
-| One static `API_TOKEN` | **Per-user** API keys — `api_keys` is reserved but unbuilt **and has no `userId`/`workspaceId` column** ([schema.ts](../../src/server/db/schema.ts)) |
+| `users` (email, name, role, `password_hash`) | ✅ built (admin + agent; nullable email for agents) |
+| Real auth, **session carries `userId`** | ✅ built (email/password; role looked up server-side) |
+| Session/token bound to **(user, workspace)** | ⚠️ user ✅, **workspace not yet** (no membership) → Phase 1 |
+| Account lifecycle: sign-up, reset, onboarding | ⚠️ admin seed + reset ✅; **self-signup not yet** → Phase 2 |
+| Per-user API keys; kill the static token | ✅ Bearer → `api_key` → `userId`; static `API_TOKEN` `@deprecated` (remove in Phase 1) |
 
 > **Security:** the shared-password + shared-token model must be **removed**, not kept alongside. In a multi-tenant app, one leaked token = full access to every tenant.
 
@@ -87,12 +91,13 @@ Member management (`settings/workspace` → invite, roles), avatars, assignee pi
 
 ---
 
-## 3. Decisions required before building
+## 3. Decisions — ✅ resolved
 
-1. **Fork a separate repo, or one codebase with a "team mode"?**
-   **Recommendation: do not hard-fork.** Build `users` + membership + authZ as the backbone inside this repo and treat single-user as a "team of one." A hard fork makes the two branches diverge and forces every bug fix to be ported twice.
-2. **Tenant boundary:** `workspace` = tenant, or add an `organization` layer above it?
-3. **Production DB for team:** commit to Postgres, with SQLite only for local/demo?
+1. **Fork vs one codebase?** → **One codebase. Path 1: one multi-tenant platform; "team" is a `workspace.plan` capability tier, not a separate app.** No hard fork. (Monorepo/`packages/core` split is optional code-org, not required.)
+2. **Tenant boundary?** → **`workspace` is the tenant.** `workspace_members(userId, workspaceId, role)` is the boundary. No `organization` layer for now.
+3. **Production DB?** → **Postgres for hosted multi-tenant prod; SQLite for local/demo only.**
+
+See [team-implementation-plan.md](team-implementation-plan.md) for the architecture and the phased roadmap these decisions produce.
 
 ---
 

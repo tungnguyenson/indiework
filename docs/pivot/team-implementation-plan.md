@@ -1,137 +1,120 @@
-# IndieWork → Team — Implementation Plan (two products, shared engine)
+# IndieWork → Path 1: one multi-tenant platform, team = capability tier
 
-> Decision: **indie and team are two separate products** that must keep existing independently — indie stays deliberately simple ("calm, no assignees"), team is a different, collaborative product. We share the **engine**, not the app, via a pnpm monorepo.
+> **Decision (locked): Path 1.** IndieWork is **one** codebase, **one** deployment, **one** auth. "Solo" and "Team" are the *same product at different capability tiers* on a workspace — a `workspace.plan` flag gates collaborative features. Upselling solo → team is **flipping a flag, zero migration**.
 >
-> Companion to [team-gap-analysis.md](team-gap-analysis.md). This is the *how*; that doc is the *what/why*. Status: **plan / not started**.
+> This supersedes the earlier "two separate apps over a shared core" draft. Identity is **real and lives in the core schema** (already built), not identity-agnostic and not `userId`-null. The monorepo/packages split is now **optional** (code-org nicety), not required.
+>
+> Companion to [team-gap-analysis.md](team-gap-analysis.md). This is the *how + roadmap*; that doc is the *what/why*. Status: **decided / in progress**.
 
 ---
 
-## 1. The core idea
+## 1. Why Path 1 (and not two apps)
 
-Do **not** copy-paste the repo (divergence) and do **not** rebuild from scratch (throws away a working product). Instead restructure the current flat Next app into a **pnpm monorepo** where ~80% of the code — the service layer, schema, domain, validators — lives once in `packages/core`, consumed by two thin apps.
+The earlier plan assumed solo would stay a dumb `APP_PASSWORD` tool, so it proposed two apps sharing an identity-agnostic core. Two facts killed that:
 
-The single move that makes one engine serve two products: **services stop assuming a single user/tenant and instead accept an injected `Ctx` (actor + tenant scope).** Indie supplies a constant "team-of-one" ctx; team resolves a real ctx per request from session + membership.
+1. **Solo is becoming a hosted multi-tenant SaaS** (many solo users on one deployment, each isolated) → solo needs the *full* identity + tenant backbone anyway.
+2. **Identity was already built into the main app** (real `users`, email/password, `userId` in the session, attribution) → the architectural line between solo and team has collapsed to a **per-workspace capability difference** (one member vs many; collab on/off), not a structural one.
 
-```
-core is tenant-scoped but identity-agnostic:
-  it knows workspaceId / userId / role — it does NOT know how users or
-  membership are stored. That lives in the team app.
-```
+So the right shape is one platform where **team is a tier**, exactly how Linear/Notion do solo-vs-team. Benefits: one backbone to maintain, one auth, one billing, and — decisively — a solo user who adds a teammate just **upgrades the workspace**, no export/import between products.
+
+| | Two apps (rejected) | **Path 1 — one platform + tier** |
+|---|---|---|
+| solo → team upsell | migrate between deployments | flip `workspace.plan`, 0 migration |
+| backbone | shared core + 2 apps | 1 app |
+| identity | agnostic core, `userId` null in solo | real `userId` everywhere (already built) |
+| cost driver | extract packages + 2nd app | tenant boundary + tier gating |
 
 ---
 
-## 2. Target structure
+## 2. Where we are today (reflects the code)
 
-```
-indiework/                         (monorepo root, pnpm workspace)
-├─ packages/
-│  ├─ core/                        the shared engine
-│  │  ├─ domain/                   was src/lib/domain (enums, constants)
-│  │  ├─ db/                       was src/server/db (schema.ts, schema.sqlite.ts, index, migrate, seed)
-│  │  ├─ services/                 was src/server/services (task, project, milestone, module, comment, workspace)
-│  │  ├─ validators/               was src/server/validators
-│  │  └─ context.ts                NEW — the Ctx type services accept
-│  └─ ui/                          (optional, later) shared tokens + primitives
-├─ apps/
-│  ├─ indie/                       the CURRENT app, moved wholesale
-│  │  ├─ src/app/                  web UI + /mcp + /api/v1
-│  │  ├─ src/server/auth/          password session + static bearer  (stays per-app)
-│  │  ├─ src/server/env.ts         APP_PASSWORD, API_TOKEN          (stays per-app)
-│  │  └─ active-workspace.ts       cookie-based                      (stays per-app)
-│  └─ team/                        NEW app
-│     ├─ src/app/                  web UI + /mcp + /api/v1 (team ctx)
-│     ├─ src/server/auth/          real users + sessions + RBAC
-│     ├─ src/server/identity/      users · workspace_members · invitations (team-only schema)
-│     └─ ...
-└─ pnpm-workspace.yaml             add `packages/*`, `apps/*`
-```
+The identity foundation is **done** — and built the Path-1 way (real identity in the main app):
 
-**What goes where — the split is clean:**
-
-| Belongs in `core` (shared) | Belongs in each app (per-product) |
+| Built | Where |
 |---|---|
-| `db/` (schema, migrate, seed) | `auth/` (how you log in) |
-| `services/` (business logic) | `env.ts` (APP_PASSWORD vs users) |
-| `validators/` | `active-workspace` resolution |
-| `domain/` (enums) | Next `app/` routes + UI screens |
-| `context.ts` (the `Ctx` *interface*) | Ctx *resolution* (who is the caller) |
-| identity-agnostic tenant scoping | identity tables (`users`, `members`) |
+| `users` table — admin + agent roles, nullable email for agents, `passwordHash`, `disabledAt` | [`schema.ts`](../../src/server/db/schema.ts) |
+| Email/password login, **session carries `userId`**, role looked up server-side | [`session.ts`](../../src/server/auth/session.ts), [`require-session.ts`](../../src/server/auth/require-session.ts) |
+| `requireSession()` gate on every Server Action; login rate-limit; admin seed/reset from env | [`auth/`](../../src/server/auth/) |
+| Attribution `createdById` on tasks + comments; legacy backfill | [`user.service.ts`](../../src/server/services/user.service.ts) |
+| **Agent-as-user**: MCP/API actions attribute to a real user; Bearer → `api_key` → `userId`; static token `@deprecated` | [`token.ts`](../../src/server/auth/token.ts) |
+
+**Model today = single-tenant with real identity ("team of one").** One admin (+ agent users). What is *not* there yet is the **tenant boundary**: there is no `workspace_members`, services are not scoped by membership, and any second admin would see everything.
 
 ---
 
-## 3. The `Ctx` seam (the load-bearing change)
+## 3. Target architecture (Path 1)
 
-`packages/core/context.ts`:
+```
+                         ┌─────────────────────────────────────────┐
+   one Next app          │  request → session (userId) ─┐          │
+   one deployment        │  or Bearer (api_key → userId)│          │
+                         │                              ▼          │
+                         │     resolve Ctx { userId, workspaceId,  │
+                         │                   role }  via membership │
+                         │                              │          │
+   every service call ───┼──────────────────────────────┘          │
+   takes ctx:            │   reads  → WHERE workspace_id = ctx.ws   │
+                         │   writes → stamp created_by/assignee     │
+                         │   guard  → can(ctx.role, action)         │
+                         │   gate   → workspace.plan unlocks collab │
+                         └─────────────────────────────────────────┘
+
+   workspace = the tenant.  workspace_members(userId, workspaceId, role) = the boundary.
+   workspace.plan ('solo' | 'team') = the capability tier.
+```
+
+**Data-model deltas (all in the one schema):**
+
+| Change | Purpose |
+|---|---|
+| **`workspace_members`** (`workspaceId`, `userId`, `role`, `status`, `invitedBy`, `joinedAt`) | the tenant boundary; solo = 1 row, team = many |
+| **`workspaces.plan`** (`'solo' \| 'team'`) (+ optional `seatLimit`) | the capability tier flag |
+| **`invitations`** (`email`, `workspaceId`, `role`, `token`, `expiresAt`, `status`) | onboarding teammates (team tier) |
+| **`tasks.assignee_id`** (nullable → users) | assignment — the headline team feature (today only `created_by_id` exists) |
+| **`projects_key_unique`** → **`(workspace_id, key)`** | multi-tenant collision fix (today global on `key`) |
+| **`USER_ROLE`** → `owner · admin · member · viewer` (+ keep `agent`) | RBAC tiers (today only `admin · agent`) |
+
+**The `Ctx` seam** — real `userId`, never null:
 
 ```ts
 export type Role = 'owner' | 'admin' | 'member' | 'viewer';
-
 export interface Ctx {
-  workspaceId: string;        // tenant scope — every query filters by this
-  userId: string | null;      // stamps created_by_id / author_id (null in indie)
-  role: Role;                 // authorization gate (always 'owner' in indie)
+  userId: string;           // real — from session or api_key (never null)
+  workspaceId: string;      // tenant scope — every query filters by this
+  role: Role;               // from workspace_members; gates mutations
 }
 ```
 
-Every service method takes `ctx` as its first argument:
+Replaces the current loose `createdById?: string | null` param threaded into a couple of services. Resolution: session/Bearer → `userId` → `workspace_members` lookup → `(workspaceId, role)`.
 
-```ts
-// before:  taskService.create(input)
-// after:   taskService.create(ctx, input)
-//   - reads  → WHERE workspace_id = ctx.workspaceId
-//   - writes → set created_by_id = ctx.userId
-//   - guard  → assert(can(ctx.role, 'task:create'))
-```
-
-- **apps/indie** builds a constant ctx: `{ workspaceId: <the one workspace>, userId: null, role: 'owner' }`. Behavior is identical to today — single-user, no assignee.
-- **apps/team** resolves ctx per request from the session → membership lookup → role.
-
-This refactor is required in **every** path; it is never wasted work.
+**Tier gating** — collaborative features check `workspace.plan`:
+- `solo`: invitations disabled, `workspace_members` stays single-row, assignee/mention/notification UI hidden, RBAC collapses to owner.
+- `team`: invitations on, multi-member, assignment, RBAC enforced, collab UI shown.
+The *engine* is identical; the tier only flips features on/off and lifts the member cap.
 
 ---
 
-## 4. Schema deltas (in `core`, both products inherit)
+## 4. Roadmap — phases → IW milestones
 
-1. **Fix the multi-tenant uniqueness bug now:** `projects_key_unique` on `key` → **`(workspace_id, key)`**. Indie (one workspace) is unaffected; team needs it.
-2. **Add nullable attribution columns** as bare uuids (no hard FK to a users table, since indie has none): `tasks.assignee_id`, `tasks.created_by_id`, `comments.author_id`. Indie leaves them null; team populates them and adds its own FK via a team-only migration.
+Each phase ships independently and keeps the app green. Phases map 1:1 to the `IW` milestones (the `Team (pivot)` module).
 
-Identity tables (`users`, `workspace_members`, `invitations`, `notifications`, `activity`) live in **apps/team**, not core. Team production targets **Postgres**; SQLite stays the indie/local/demo path (avoids the single-writer lock for concurrent team writes — see [team-gap-analysis.md §2.7](team-gap-analysis.md)).
+| Phase | Milestone | State | Scope |
+|---|---|---|---|
+| **0** | Identity foundation | ✅ **done** | users, email/password, session `userId`, attribution, agent-as-user, token→user |
+| **1** | Tenant boundary — membership + scoping + Ctx | ▶ **next/active** | `workspace_members`; real `Ctx`; scope **every** query by membership; `(workspace_id, key)` fix; `assignee_id`; expand roles; tenant-isolation tests |
+| **2** | Multi-tenant onboarding | planned | self-signup + workspace bootstrap per user → **unlocks the solo SaaS hosting goal** |
+| **3** | Team tier (capability flag) | planned | `workspace.plan`; invitations + accept/decline; member management UI; assignee picker; RBAC **enforcement**; gate collab UI by tier |
+| **4** | Collaboration | planned | @mentions, notifications (inbox + email), activity feed, (presence later) |
+| **5** | Billing & ops | planned | per-seat billing (Stripe), seat counting off `workspace_members`, queue/worker for email, Postgres prod hardening (pooling, backups) |
+| **6** | Monorepo & packages | **optional** | extract `packages/core` + `ui` purely for code organization — *not* required by Path 1 |
 
----
-
-## 5. Phased migration (green after every phase)
-
-Each phase is independently shippable and reversible. Use `git mv` throughout to preserve history.
-
-| Phase | Work | Risk |
-|---|---|---|
-| **0 — Monorepo skeleton** | Add workspace globs; `git mv` the whole current app into `apps/indie/`. No behavior change. Build + tests green. | Low (mechanical) |
-| **1 — Extract `packages/core`** | `git mv` `db` + `services` + `validators` + `lib/domain` into `core`. Add package.json/tsconfig/exports. Swap `@/server/*` imports → `@indiework/core`. Introduce `Ctx` with a default team-of-one. Green. | Low–med |
-| **2 — Make services ctx-aware** | Thread `ctx` through every service method; scope reads, stamp writes, gate by role. Fix `(workspace_id, key)`. Add nullable attribution columns. Indie still single-user. Green. | **Med (touches every read path)** |
-| **3 — Extract `packages/ui`** *(optional)* | Share tokens + low-level primitives only; let each app own its screens. Defer if indie/team UIs diverge a lot. | Low |
-| **4 — Scaffold `apps/team`** | New Next app importing `@indiework/core`. Identity tables + real auth + invitation flow. Per-request ctx from session+membership. RBAC. Team-only UI (members, assignee picker). | High (new product) |
-| **5 — Team features** | Mentions → notifications, activity feed, billing. Iterative. | Incremental |
-
-**Phases 0–2 are the foundation and the highest-leverage work** — they convert the codebase into a shared engine and are prerequisites for the team app. Do them first, on a branch, before any team UI exists.
+**Critical path:** Phase 1 is load-bearing and blocks everything (even solo multi-tenant hosting). Phase 2 alone unlocks the hosted solo SaaS. Phase 3 turns on "team." Phases 4–5 are incremental. Phase 6 is optional and can happen any time (or never).
 
 ---
 
-## 6. Surfaces that need a per-app decision
+## 5. Sequencing notes
 
-- **MCP `/mcp` + REST `/api/v1`:** thin dispatchers over services. The protocol/dispatch logic is shareable; **auth + ctx resolution differs** (indie: static token → team-of-one; team: token → user+workspace). Start by reusing the dispatch shell and injecting ctx resolution per app; extract to core later if duplication hurts.
-- **Dual schema (pg + sqlite):** team only needs Postgres. Keep both in core but team migrations target pg only.
-- **Seed scripts:** core owns the shared seed; each app seeds its own auth/identity fixtures.
-
----
-
-## 7. Why this beats copy-paste, restated
-
-| | Copy-paste fork (rejected) | Monorepo + core (this plan) |
-|---|---|---|
-| Bug fix in shared logic | port by hand to 2 repos | fix once in `core` |
-| Schema/service drift | guaranteed within weeks | impossible — one source |
-| Indie stays simple | yes, but frozen by neglect | yes, by design (no team UI) |
-| Upfront cost | low | **Phases 0–2** (the ctx refactor) |
-| Cost is required anyway | n/a | yes — ctx/tenant seam is needed for team regardless |
-
-The upfront cost (Phases 0–2) is exactly the work the team product needs no matter what. So it is paid once and shared, never duplicated.
+- **Phase 1 is the only hard part left.** It touches every read path (scoping) and replaces the `createdById?` param with `Ctx`. Do it on a branch, behind tenant-isolation tests, before any team UI.
+- **Static `API_TOKEN` must die in Phase 1** — [`token.ts`](../../src/server/auth/token.ts) already marks it `@deprecated "remove before any multi-tenant step"`. A shared token can't carry a tenant.
+- **Dual schema (pg + sqlite):** hosted multi-tenant prod = **Postgres**. SQLite stays for local/demo only.
+- **Migration of existing data:** the single admin becomes the **owner** of the existing workspace via one `workspace_members` row; `createdById` is already backfilled. Trivial — no user-minting needed (it was done in Phase 0).
