@@ -76,7 +76,15 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   return (
     <html lang="en" className={fontVars} data-theme="light" suppressHydrationWarning>
       <body>
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: fontBootScript }} />
+        {/*
+          The browser clears the `nonce` content attribute from the DOM after
+          parsing (HTML spec, anti-exfiltration) and Next strips it from the
+          client RSC payload, so React sees server `nonce="…"` vs client
+          `nonce=""` and flags an attribute mismatch. The script still ran (it
+          carried the nonce at parse time); the `__html` is a static constant,
+          identical both sides — suppress the cosmetic attribute diff.
+        */}
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: fontBootScript }} />
         {children}
       </body>
     </html>
