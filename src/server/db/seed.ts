@@ -34,6 +34,32 @@ async function defaultWorkspaceId(): Promise<string | null> {
   return row?.id ?? null;
 }
 
+/** Idempotent: ensure a (user, workspace) membership row with the given role. */
+async function ensureMembershipRow(
+  userId: string,
+  workspaceId: string,
+  role: 'owner' | 'admin' | 'member' | 'viewer',
+): Promise<void> {
+  const [existing] = await db
+    .select({ id: schema.workspaceMembers.id })
+    .from(schema.workspaceMembers)
+    .where(
+      and(
+        eq(schema.workspaceMembers.userId, userId),
+        eq(schema.workspaceMembers.workspaceId, workspaceId),
+      ),
+    )
+    .limit(1);
+  if (existing) return;
+  await db.insert(schema.workspaceMembers).values({
+    userId,
+    workspaceId,
+    role,
+    status: 'active',
+    joinedAt: new Date(),
+  });
+}
+
 /**
  * P1 tenant-boundary backfill (idempotent, driver-agnostic). The Postgres
  * migration 0005 already does this durably for the pg path; running it here too
@@ -69,34 +95,23 @@ async function backfillTenancy() {
   // 4) Remaining (Inbox + null-workspace) tasks → default workspace.
   await db.update(schema.tasks).set({ workspaceId: wsId }).where(isNull(schema.tasks.workspaceId));
 
-  // 5) First human user → owner of the default workspace (membership bootstrap).
+  // 5) First human user → OWNER of the default workspace (membership bootstrap).
   const [firstHuman] = await db
     .select({ id: schema.users.id })
     .from(schema.users)
     .where(eq(schema.users.role, 'human'))
     .orderBy(schema.users.createdAt)
     .limit(1);
-  if (firstHuman) {
-    const [existing] = await db
-      .select({ id: schema.workspaceMembers.id })
-      .from(schema.workspaceMembers)
-      .where(
-        and(
-          eq(schema.workspaceMembers.userId, firstHuman.id),
-          eq(schema.workspaceMembers.workspaceId, wsId),
-        ),
-      )
-      .limit(1);
-    if (!existing) {
-      await db.insert(schema.workspaceMembers).values({
-        userId: firstHuman.id,
-        workspaceId: wsId,
-        role: 'owner',
-        status: 'active',
-        joinedAt: new Date(),
-      });
-    }
-  }
+  if (firstHuman) await ensureMembershipRow(firstHuman.id, wsId, 'owner');
+
+  // 6) Every agent user → MEMBER of the default workspace. Without this,
+  //    ctxFromBearer(roleOf=null) would 401 every MCP/REST call (design §11).
+  const agents = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(eq(schema.users.role, 'agent'));
+  for (const a of agents) await ensureMembershipRow(a.id, wsId, 'member');
+
   console.info('✓ backfilled tenant boundary (members, task workspace, plan)');
 }
 
