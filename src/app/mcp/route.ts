@@ -92,6 +92,19 @@ const slimModule = (m: { id: string; name: string; state: string }) => ({
   state: m.state,
 });
 const slimComment = (c: { id: string; source: string }) => ({ id: c.id, source: c.source });
+const commentView = (c: {
+  id: string;
+  body: string;
+  source: string;
+  createdAt: Date;
+  editedAt: Date | null;
+}) => ({
+  id: c.id,
+  body: c.body,
+  source: c.source,
+  createdAt: c.createdAt,
+  editedAt: c.editedAt,
+});
 
 const TOOLS = (agentUserId: string): Tool[] => [
   {
@@ -278,6 +291,31 @@ const TOOLS = (agentUserId: string): Tool[] => [
           agentUserId,
         ),
       ),
+  },
+  {
+    name: 'list_comments',
+    description:
+      'List a task\'s comment timeline in chronological order (oldest first). `ref` is a task ref, e.g. "SITE-3". Each comment has an `id` (use it with update_comment / delete_comment), `body`, `source` (web·api·mcp·agent), `createdAt`, and `editedAt` (null until first edit).',
+    inputSchema: { type: 'object', properties: { ref: str() }, required: ['ref'] },
+    run: async (a) => (await commentService.list(await idFromRef(a.ref))).map(commentView),
+  },
+  {
+    name: 'update_comment',
+    description:
+      'Edit a comment\'s body in place by its `id` (get the id from list_comments or add_comment). Stamps an "edited" badge but keeps the original source. Markdown.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: str(), body: str() },
+      required: ['id', 'body'],
+    },
+    run: async (a) => slimComment(await commentService.update({ id: a.id, body: a.body })),
+  },
+  {
+    name: 'delete_comment',
+    description:
+      'Permanently delete a comment by its `id` (get the id from list_comments). Hard delete — cannot be undone.',
+    inputSchema: { type: 'object', properties: { id: str() }, required: ['id'] },
+    run: async (a) => slimComment(await commentService.delete({ id: a.id })),
   },
   {
     name: 'set_status_note',

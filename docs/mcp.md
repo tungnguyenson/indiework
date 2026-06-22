@@ -68,7 +68,7 @@ curl -s -X POST http://localhost:3000/mcp \
 
 ## Tools
 
-25 tools, each a thin wrapper over a service method. Grouped by what they touch.
+28 tools, each a thin wrapper over a service method. Grouped by what they touch.
 
 > **Write tools return a slim confirmation, not the full row.** `create_*` / `update_*` /
 > `add_subtask` / `set_*` / `archive_*` echo back just the handle (`ref` / `id` / `key`) plus a
@@ -88,6 +88,9 @@ curl -s -X POST http://localhost:3000/mcp \
 | `update_task` | `ref`, `patch` | — | `patch` may set `title`, `status`, `priority`, `moduleId`, `milestoneId`, `dueDate`, `statusNote`, `description`. |
 | `update_tasks` | `updates` | — | **Bulk patch** in one call. `updates` is an array of `{ ref, patch }` (same `patch` keys as `update_task`). Returns one `{ ok, ref }` / `{ ok: false, ref, error }` per item. |
 | `add_comment` | `ref`, `body` | — | Appended to the timeline with source `agent`. |
+| `list_comments` | `ref` | — | The task's comment timeline, oldest first. Each row has an `id` (use with `update_comment` / `delete_comment`), `body`, `source` (`web · api · mcp · agent`), `createdAt`, `editedAt` (null until first edit). |
+| `update_comment` | `id`, `body` | — | Edits a comment in place **by its `id`** (from `list_comments` / `add_comment`). Keeps the original `source`, stamps an "edited" badge. |
+| `delete_comment` | `id` | — | **Hard delete — cannot be undone.** Removes a comment **by its `id`** (from `list_comments`). |
 | `set_status_note` | `ref`, `note` | — | Overwrites the pinned status note (what's blocking / where it is). |
 | `delete_task` | `ref` | — | **Hard delete — cannot be undone.** |
 | `list_inbox` | — | — | Untriaged Inbox tasks. |
@@ -126,7 +129,9 @@ curl -s -X POST http://localhost:3000/mcp \
 - **`project`** is a project **KEY** (e.g. `SITE`), not an internal id.
 - **`ref` / `parent_ref`** is the human ref (e.g. `SITE-3`), shown on every task row.
 - **`id`** (on the milestone/module tools, and `module` / `milestone` on `create_task` /
-  `list_tasks`) is the internal uuid — get it from **`get_project`**.
+  `list_tasks`) is the internal uuid — get it from **`get_project`**. On `update_comment` /
+  `delete_comment` the `id` is a **comment** uuid — get it from **`list_comments`** (or the
+  result of `add_comment`).
 - **`patch`** objects use **camelCase** keys (e.g. `statusNote`, `dueDate`, `targetDate`),
   per each tool's row above.
 - **`status`** is one of `inbox · backlog · todo · in_progress · in_review · pending ·
@@ -138,8 +143,8 @@ curl -s -X POST http://localhost:3000/mcp \
 - **Inbox tasks have no `ref` yet.** A task created without a `project` lands in the
   Inbox with `ref: null` / `seq: null` — a per-project ref (`KEY-<n>`) is only
   allocated when the task is **triaged into a project**. Until then the ref-based
-  tools (`get_task`, `update_task`, `add_comment`, `set_status_note`, `delete_task`)
-  can't address it, and they reject the raw uuid too. To get an addressable task
+  tools (`get_task`, `update_task`, `add_comment`, `list_comments`, `set_status_note`,
+  `delete_task`) can't address it, and they reject the raw uuid too. To get an addressable task
   immediately, pass `project` on `create_task`; otherwise triage the Inbox task
   (web UI) first.
 - **POST only.** `GET /mcp` returns `405` — the server is stateless and opens no

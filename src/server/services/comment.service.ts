@@ -1,6 +1,10 @@
 import { asc, eq } from 'drizzle-orm';
 import { db, schema } from '@/server/db';
-import { addCommentSchema, updateCommentSchema } from '@/server/validators/comment';
+import {
+  addCommentSchema,
+  updateCommentSchema,
+  deleteCommentSchema,
+} from '@/server/validators/comment';
 import type { CommentSource } from '@/lib/domain';
 import { notFound } from './errors';
 
@@ -47,6 +51,18 @@ export const commentService = {
     const [row] = await db
       .update(schema.comments)
       .set({ body: data.body, editedAt: new Date() })
+      .where(eq(schema.comments.id, data.id))
+      .returning();
+    if (!row) throw notFound('comment');
+    return row;
+  },
+
+  /** Permanently remove a comment by id. Hard delete — there is no soft-delete. */
+  async delete(input: unknown) {
+    const data = deleteCommentSchema.parse(input);
+
+    const [row] = await db
+      .delete(schema.comments)
       .where(eq(schema.comments.id, data.id))
       .returning();
     if (!row) throw notFound('comment');

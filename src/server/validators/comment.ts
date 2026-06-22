@@ -13,3 +13,8 @@ export const updateCommentSchema = z.object({
   body: z.string().trim().min(1, 'body is required').max(10000),
 });
 export type UpdateCommentInput = z.infer<typeof updateCommentSchema>;
+
+export const deleteCommentSchema = z.object({
+  id: z.uuid(),
+});
+export type DeleteCommentInput = z.infer<typeof deleteCommentSchema>;

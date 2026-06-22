@@ -251,7 +251,7 @@ export const attachments = pgTable(
   (t) => [index('attachments_task_idx').on(t.taskId)],
 );
 
-// ---- comments (= timeline / journal, append-only) ----
+// ---- comments (= timeline / journal; mostly append, but editable + hard-deletable) ----
 export const comments = pgTable(
   'comments',
   {

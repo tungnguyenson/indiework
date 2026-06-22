@@ -113,6 +113,22 @@ describe('service slice (real Postgres)', () => {
     ).rejects.toMatchObject({ code: 'not_found' });
   });
 
+  test('delete removes a comment from the timeline', async () => {
+    const t = await taskService.create({ projectId, title: 'Deletable' });
+    const created = await commentService.add({ taskId: t.id, body: 'temporary', source: 'agent' });
+    expect(await commentService.list(t.id)).toHaveLength(1);
+
+    const removed = await commentService.delete({ id: created.id });
+    expect(removed.id).toBe(created.id);
+    expect(await commentService.list(t.id)).toHaveLength(0);
+  });
+
+  test('delete throws not_found for an unknown comment id', async () => {
+    await expect(
+      commentService.delete({ id: '00000000-0000-0000-0000-000000000000' }),
+    ).rejects.toMatchObject({ code: 'not_found' });
+  });
+
   test('getByRef resolves a display ref', async () => {
     const t = await taskService.getByRef('ZZTEST-1');
     expect(t.title).toBe('First');
