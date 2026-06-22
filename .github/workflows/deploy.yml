@@ -7,14 +7,14 @@ on:
   pull_request:
     branches: [main]
 
-concurrency:
-  group: deploy-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   # ---- CI: lint, typecheck, unit + integration tests (real Postgres) ----
   ci:
     runs-on: ubuntu-latest
+    # A newer push supersedes an in-flight CI run.
+    concurrency:
+      group: ci-${{ github.ref }}
+      cancel-in-progress: true
     services:
       postgres:
         image: postgres:17-alpine
@@ -57,6 +57,10 @@ jobs:
     needs: ci
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # Superseding an in-flight build is fine — cancel it.
+    concurrency:
+      group: build-${{ github.ref }}
+      cancel-in-progress: true
     permissions:
       contents: read
       packages: write
@@ -83,6 +87,14 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    # Never cancel a deploy mid-flight. Killing the SSH step during
+    # `docker compose pull` orphans a containerd content-store ingest, which
+    # makes the NEXT pull fail with:
+    #   commit failed: rename …/ingest/…/data …/blobs/sha256/…: no such file
+    # Queue concurrent deploys (cancel-in-progress: false) instead of cancelling.
+    concurrency:
+      group: deploy-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       - uses: appleboy/ssh-action@v1
         with:
@@ -94,6 +106,20 @@ jobs:
           script: |
             set -e
             cd ~/indiework
-            docker compose -f compose.prod.yml pull
+
+            # Reclaim disk from dangling images BEFORE pulling. A full /var is a
+            # classic trigger for the containerd ingest-commit failure (the
+            # half-written blob is reaped, so the final rename finds nothing).
+            docker image prune -f || true
+            df -h /var | tail -1
+
+            # Pull SERIALIZED. compose.prod.yml runs two services (app + demo) off
+            # the SAME image; `docker compose pull` is parallel by default, so it
+            # fetches the identical blob twice at once and the two ingests race on
+            # commit → "rename …/ingest…: no such file". --parallel 1 = one blob in
+            # flight at a time = no race.
+            pull() { docker compose --parallel 1 -f compose.prod.yml pull; }
+            pull || { echo "pull failed — pruning and retrying once"; docker image prune -f || true; pull; }
+
             docker compose -f compose.prod.yml up -d
             docker image prune -f
