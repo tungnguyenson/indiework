@@ -55,6 +55,7 @@ services:
       - -c
       - >-
         node --import tsx src/server/db/migrate.ts &&
+        node --import tsx src/server/db/seed.ts &&
         node --import tsx src/server/db/seed-sample.ts &&
         pnpm start --port 3000 --hostname 0.0.0.0
     # Reverse proxy forwards indiework.space + demo.indiework.space here.
