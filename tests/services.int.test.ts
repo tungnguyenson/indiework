@@ -28,7 +28,10 @@ afterAll(async () => {
   await closeDb();
 });
 
-describe('service slice (real Postgres)', () => {
+// Hits a real database, so it runs ONLY against a dedicated TEST_DATABASE_URL
+// (routed in vitest.config.ts). A bare `pnpm test` skips it — never touching the
+// dev DB. Run it with:  TEST_DATABASE_URL=postgres://…/indiework_test pnpm test
+describe.skipIf(!process.env.TEST_DATABASE_URL)('service slice (real Postgres)', () => {
   test('create project', async () => {
     const p = await projectService.create({ key: KEY, name: 'Slice Test' });
     projectId = p.id;
