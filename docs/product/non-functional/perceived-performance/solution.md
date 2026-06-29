@@ -40,6 +40,11 @@ This loop is the mechanism behind instant write feedback (**PP-W1**) and guarant
 (**PP-F4**): a thrown action makes React auto-revert the optimistic value, and a successful one
 is superseded by re-flowed truth either way.
 
+> **"No client cache" is refined for reads (§8).** The claim above holds for the **write loop**.
+> **PP-R5** (instant re-open) and **PP-W5** (cross-surface sync) require a deliberate, scoped
+> client read-store; see §8 and [ADR 0003](../../../adr/0003-client-read-cache-reconcile.md). It is
+> additive — the write loop here is unchanged.
+
 **Deliberate exclusion:** `createTask` stays non-optimistic (board `addTo`) — it needs a
 server-generated id/ref, so it `router.refresh()`es instead of predicting.
 
@@ -74,6 +79,13 @@ Consequences for our model:
   `useOptimistic` onto re-flowed props. The classic fixes (client sequence token, drop-stale
   response, per-entity mutation queue) target a **client-cache** model; they have nothing to
   attach to here and are intentionally **not** implemented.
+
+> **This guarantee is write-path only — a read cache reintroduces the step it relies on.** "No manual
+> apply-server-response step" stops being true once §8's client read-cache lands: a background
+> revalidation *is* a manual apply, so PP-F5's by-construction hold does **not** extend to it.
+> **PP-F6** makes that read-path correctness explicit, met by §8's version guard (drop a response
+> whose version is older than `base`) + draft overlay (never stomp an in-progress edit) — i.e. the
+> exact "drop-stale-response" fix called unnecessary here, now necessary there.
 
 **The real UI case.** On the board, a drag is a **cross-column status patch** (`updateTask`),
 committed **on drop** (one write per drop — [board.tsx](../../../../src/components/app/board.tsx)
@@ -263,11 +275,72 @@ surfaces is tracked as the PP-F slice of the §measurement todo in [plan.md](pla
 
 ---
 
+## 8. Client read-cache & the base ⊕ draft reconcile substrate (target — not yet built)
+
+§1–§7 hold the write path instant and the read shell streaming **without ever caching read data on
+the client** — "the server *is* the cache" (§1). Two requirements break that stance and need a small,
+deliberate client-side store: **PP-R5** (re-opening a recently-viewed entity must paint instantly,
+not re-pay the load) and **PP-W5** (a list and an open detail panel must stay consistent on every
+field). The detail panel today does its **own independent fetch** on every open/switch
+([use-task-detail.ts](../../../../src/components/app/task-detail/use-task-detail.ts) `useEffect` →
+`getTaskDetailByRef`) with **no** mirror and **no** `useOptimistic` — so clicking A → B → A re-reads
+A from the (possibly slow) DB each time, and a list edit never reaches an open panel.
+
+**The shared substrate: server-base ⊕ local-draft.** Model each open entity as two layers, rendered
+merged:
+
+```
+render(entity) = { ...base, ...draft }     // draft wins, per field
+```
+
+- **`base`** — the server snapshot (the cache value). Reads **and** write responses write here, but
+  **monotonically**: an incoming value is applied only if its version is **≥** the base's current
+  version, so a late read can never move `base` backwards. Version source: the entity's `updatedAt`
+  (currently in the DB schema but **not** exposed in `toTaskDto` — a small DTO addition) or, as a
+  fallback, a per-entity client epoch bumped on each local mutation.
+- **`draft`** — `Partial<fields>` the user has changed locally and not yet reconciled. Set on edit;
+  **cleared per field** when that field's write resolves (its returned row updates `base`). A read
+  never touches `draft`, so a background revalidation cannot stomp an in-progress edit.
+
+This is the same *optimistic-over-authoritative-base* shape ADR 0002 uses for the board/list
+(`useOptimistic` over the `tasks` prop), generalised to a free-text, multi-field surface and made to
+persist a draft across the typing window rather than only for a transition's duration.
+
+**The substrate is necessary but not sufficient** — each requirement layers its own wiring on top,
+and they are **different problems**:
+
+- **Layer A — cross-surface propagation (PP-W5, spatial).** Two concurrently-visible views of the
+  same entity must converge. base ⊕ draft *in the panel alone does not do this* — the list and panel
+  must read from a **shared source** (one mirror feeding both) or publish patches both subscribe to
+  (a first-class bidirectional `iw:task-updated`, extending the current title-only event). This is
+  the bulk of **IW-99** and is larger than "add a cache". → tracked as PP-W5 in [plan.md](plan.md).
+- **Layer B — read cache + revalidation + version guard (PP-R5 / PP-F6, temporal).** One view over
+  successive fetches. A per-`ref` cache store seeds `base` instantly on re-open (PP-R5); a background
+  revalidation (on open / on focus / past a `staleTime`) refreshes `base` under the monotonic version
+  guard; the draft overlay + version guard together are the **PP-F6** correctness tax — the step §2
+  says the no-cache design avoided. The cache primarily buys **perceived** instant paint; `staleTime`
+  is the knob that also cuts real refetches, and single-user lets it be generous (only the rare MCP /
+  external write changes data this client didn't make).
+
+**Scope guard.** This is a per-surface read store for the detail entity, **not** the global
+`tasks` store ADR 0002 rejected (and not offline durability — DB stays the source of truth, [spec.md
+§3](spec.md)). It reverses the §1 "no client cache" stance **only** for cached entity reads, with the
+version guard as the price. Reasoned in [ADR 0003](../../../adr/0003-client-read-cache-reconcile.md).
+
+**Failure & convergence.** A failed field write clears its `draft` entry → reverts to `base` + the
+existing toast/Retry (§7). Convergence to server truth (**PP-F4**) is unchanged: `base` always settles
+to the latest authoritative row; `draft` only ever delays a *stale* value from winning, never a newer
+one.
+
+---
+
 ## References
 
 - [spec.md](spec.md) — the requirements these mechanisms satisfy.
 - [plan.md](plan.md) — per-ID status; links into the sections above.
 - [ADR 0002](../../../adr/0002-optimistic-updates.md) — the optimistic-update decision (§1, §7).
+- [ADR 0003](../../../adr/0003-client-read-cache-reconcile.md) — the client read-cache + base ⊕ draft
+  reconcile decision (§8); reverses the §1 "no client cache" stance for cached reads.
 - [deploy-vercel-supabase.md](../../../infra/deploy-vercel-supabase.md) — managed-path infra (§6).
 - Next 16 action queue: `packages/next/src/client/components/app-router-instance.ts`
   (`AppRouterActionQueue`, `runRemainingActions`) — the basis for §2.

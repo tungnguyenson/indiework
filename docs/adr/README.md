@@ -14,3 +14,4 @@ For *what the product is* see [../scope.md](../product/scope.md); for *build ord
 |------|-----------------------------------------------------------------------|----------|------------|
 | 0001 | [MCP as the agent surface for task & project management](0001-mcp-as-agent-surface.md) | Accepted | 2026-06-14 |
 | 0002 | [Optimistic updates for board/list mutations](0002-optimistic-updates.md) | Accepted | 2026-06-15 |
+| 0003 | [Client read-cache + base ⊕ draft reconcile for entity detail](0003-client-read-cache-reconcile.md) | Accepted | 2026-06-27 |
