@@ -35,7 +35,7 @@ any of it is built. Four categories:
 
 | Prefix | Surface | The required experience |
 |--------|---------|-------------------------|
-| **PP-W** | Write responsiveness | A mutation gives immediate, visible feedback — the user never doubts whether their action registered. |
+| **PP-W** | Write responsiveness | A mutation gives immediate, visible feedback **everywhere on screen the change applies** — the user never doubts whether their action registered, and never sees one view update while another view of the same data (same screen) lags behind. |
 | **PP-R** | Read responsiveness | Loads and navigations show meaningful structure promptly; slow data fills in progressively instead of blocking the whole view. |
 | **PP-B** | Actual latency budget | The underlying work's real time has a hard ceiling — the base cost that PP-W/PP-R sit on top of. Perceived speed only hides latency; it doesn't eliminate it. |
 | **PP-F** | Failure feedback & reconciliation | When work fails or stalls, the user is told, can recover, and the screen always settles to the true state. |
@@ -44,7 +44,9 @@ any of it is built. Four categories:
 
 ## 1. Context — perceived performance is universal; latency is the variable
 
-Perceived performance is the gap between a user's intent and a visible, trustworthy response.
+Perceived performance is the gap between a user's intent and a visible, trustworthy response —
+prompt, and **consistent** across every part of the screen that reflects the change. A fast update
+that leaves a second, simultaneously-visible view of the same data stale still reads as broken.
 **Every** system has it, local or distributed: real work (a query, server compute, the client
 render) takes nonzero time, and that time **spikes** under load, lock contention, a bad query
 plan, a cold cache, or a large payload. A local Postgres call is cheaper than a cross-region one,
@@ -85,6 +87,7 @@ deployment.
 | **PP-W2** | While a save is pending, the rest of the surface stays **interactive**. A pending write must not freeze the board/list or block an unrelated interaction. | No full-surface disable. INP for the surface stays **< 200 ms** during a pending write. |
 | **PP-W3** | Two quick successive interactions on **different rows/cards** must not serialize behind each other. | Second gesture paints within PP-W1's budget regardless of whether the first write has resolved. |
 | **PP-W4** | When the **same field** is changed several times in quick succession (e.g. dragging one card through several positions before it settles), the persisted and displayed value converges to the user's **last** intent — out-of-order completion of the individual writes must not leave an earlier value as the winner. | After the burst settles, both server state and on-screen state equal the last intent; no superseded intermediate value wins. (Complements PP-W3 — different rows; relies on PP-F5 + PP-F4.) |
+| **PP-W5** | An edit to a field reflects in **every on-screen view of that same entity**, not only the surface where the gesture happened. When a list and an open detail panel (master–detail) both show a task, editing it in either updates the other **immediately** — no concurrently-visible view shows a stale or superseded value. Holds for **every** field uniformly; partial coverage (one field syncs cross-view, another lags) is itself a failure. | Each on-screen representation of the edited entity updates within **100 ms** of the gesture (per PP-W1), while the save is pending and after it settles; no second open view ever shows a value the user has already changed. This is convergence **across open views, immediately** — and complements PP-F4 (convergence to *server* truth, eventually). |
 
 ### PP-R — Read & navigation responsiveness
 
@@ -94,6 +97,7 @@ deployment.
 | **PP-R2** | Navigation between app surfaces shows an **immediate** loading state — never a blank screen or a frozen copy of the previous view while data loads. | A placeholder is visible within **~100 ms** of the navigation intent. |
 | **PP-R3** | Slow data regions **fill in progressively** behind a placeholder, rather than holding the whole view hostage to the slowest query. | Each region replaces its own placeholder as its data arrives; **CLS < 0.1** across the swap. |
 | **PP-R4** | A surface's initial data load stays within budget for an interactive feel on the production deployment. | **LCP < 2.5 s** for the primary app surfaces (board, list, inbox). |
+| **PP-R5** | **Re-opening** an entity already viewed earlier in the session (e.g. clicking back to a task whose detail was shown) paints its **last-known content immediately** — not a skeleton, not a blank, not a frozen copy of another entity — then silently revalidates to server truth. A re-visit must not re-pay the full first-open load latency. | Cached content paints within **~100 ms** of the re-open (no network on the cache hit — typically the next frame), then a background revalidation replaces it within the read budget **without a visible flip**. Subject to PP-F4/PP-F5/PP-F6/PP-W5 — the instant paint must never show or persist a value the user has already superseded locally. |
 
 ### PP-B — Actual latency budget
 
@@ -119,17 +123,35 @@ deployment.
 | **PP-F3** | A write that exceeds a **latency threshold** shows a "still saving…" affordance, so a slow save is not mistaken for a frozen UI. | In-progress affordance appears after **~1 s** if the write has not yet resolved. |
 | **PP-F4** | The displayed state **always converges** to authoritative server truth; no permanent divergence between what is shown and the real data. | After any mutation settles (success or failure), on-screen state equals server state. |
 | **PP-F5** | A **late or out-of-order** server response must not overwrite a **newer** local state. Once a more recent change to the same entity exists, the older in-flight response is reconciled away, never replayed onto the UI. | UI never visibly flips back to a superseded value; the state that survives reconciliation is the latest intent, not whichever response landed last. |
+| **PP-F6** | A **read or cache revalidation** must not overwrite local state the user is **currently editing** (an uncommitted draft) or a value **more recently committed** than that read was issued. Holds for **every** field uniformly. Fields the user has **not** touched still refresh to server truth. | After a revalidation settles: no field being edited loses keystrokes; no field flips back to a value the user already changed; untouched fields reflect server truth. Complements PP-F5 (guards *write* responses against out-of-order replay) and PP-W5 (cross-view sync). This is the **temporal** read-cache guard — server truth vs newer local intent across successive fetches — the correctness tax a read cache (PP-R5) introduces. |
 
 ---
 
 ## 3. Non-goals (explicitly out of scope)
 
-- **Real-time multi-client sync.** IndieWork is single-user; no presence, no live cross-device
-  push. (See [scope.md](../../scope.md) §1.)
-- **Cross-surface instant propagation.** Editing in one view is not required to *instantly*
-  update another simultaneously-open view; a brief re-sync after the change is acceptable.
-  Revisit only if cross-surface staleness becomes a *real* complaint — not pre-emptively (YAGNI).
+- **Real-time multi-client sync.** IndieWork is single-user; no presence, no live push across
+  **separate clients, tabs, or devices**. (See [scope.md](../../scope.md) §1.) *Concurrent surfaces
+  within a single screen — e.g. a list and an open detail panel — are explicitly **in** scope; their
+  same-screen consistency is required by **PP-W5**.*
 - **Offline-first / local-write durability.** Out of scope; the DB is the single source of truth.
+
+> **Bar change (2026-06-26).** "Cross-surface instant propagation" was previously a non-goal
+> (YAGNI — "revisit only if it becomes a real complaint"). It is now requirement **PP-W5**: that
+> trigger fired — same-screen staleness between a list and an open detail panel is a real,
+> reproducible complaint, and the mission is *fast **and** consistent*, not fast-but-stale. The
+> single-client / single-screen product scope is unchanged; only the same-screen consistency bar moved.
+
+> **Bar change (2026-06-27).** Added **PP-R5** (instant re-open of an already-viewed entity) and
+> **PP-F6** (a read/revalidation must not clobber newer local state). Trigger: clicking back and
+> forth between two recently-viewed entities (e.g. task A ↔ task B in a detail panel) re-pays the
+> full load latency on **every** re-open — a real, reproducible cost on a slow DB, where the data
+> was on screen seconds ago. Meeting PP-R5 implies introducing a client-side read cache, which
+> **reintroduces** the "apply a server response onto the UI" step that PP-F5 currently avoids by
+> construction — hence PP-F6 makes that read-path correctness an explicit, testable bar rather than
+> an emergent property. Both are read-side perceived-performance requirements; the single-user
+> product scope is unchanged. The *mechanism* (read cache + a server-base ⊕ local-draft reconcile +
+> a per-entity version guard) and the architectural reversal are reasoned in
+> [solution.md](solution.md) and [ADR 0003](../../../adr/0003-client-read-cache-reconcile.md).
 
 ---
 
@@ -140,10 +162,21 @@ Each requirement is verifiable; the status tracker records the method per item.
 - **PP-W / PP-R**: performance traces + Lighthouse against the production deployment; INP/LCP/CLS
   measured on the real surfaces. PP-W4: fire a rapid same-entity burst (repeated reorder) and
   assert persisted + displayed state equal the last intent.
+- **PP-W5**: open two surfaces showing the same entity (list + detail panel); edit **each field** in
+  one and assert the other reflects it within budget and never shows a stale value — **both
+  directions, every field**, not one representative. A field that syncs one way only, or only for
+  some fields, fails.
 - **PP-B**: query count per request, region check on the deployment, and a concurrency load test
   for connection exhaustion.
 - **PP-F**: fault injection — force a write to fail / time out and observe the affordance. PP-F5:
   inject delayed / out-of-order responses and assert the UI never flips back to a superseded value.
+- **PP-R5**: view entity A, then B, then re-open A with the network **throttled**; assert A's content
+  (not a skeleton) is on screen within budget on the re-open, and that a background revalidation
+  fires and converges. Negative check: a re-open must not block on a fresh round-trip.
+- **PP-F6**: fault injection on the **read** path — while editing **each** field, inject a delayed or
+  stale revalidation response and assert (a) no in-progress keystroke is lost, (b) no field flips
+  back to a value already changed, (c) a field the user did **not** touch still refreshes to server
+  truth. Every field, not one representative.
 
 ---
 

@@ -66,12 +66,15 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  // Every route except API/MCP (own auth + error shapes), Next's static assets,
-  // and the favicon. The `missing` clause skips client-side prefetches so a
-  // prefetched payload never carries a nonce that won't match its document.
+  // Every route except API/MCP (own auth + error shapes), all of `_next`, and the
+  // favicon. Excluding all of `_next` (not just static/image) keeps the proxy off
+  // the dev HMR WebSocket upgrade at `/_next/webpack-hmr` — returning a normal HTTP
+  // response there breaks the 101 handshake (ERR_INVALID_HTTP_RESPONSE) and kills
+  // hot reload. The `missing` clause skips client-side prefetches so a prefetched
+  // payload never carries a nonce that won't match its document.
   matcher: [
     {
-      source: '/((?!api|mcp|_next/static|_next/image|favicon.ico).*)',
+      source: '/((?!api|mcp|_next|favicon.ico).*)',
       missing: [
         { type: 'header', key: 'next-router-prefetch' },
         { type: 'header', key: 'purpose', value: 'prefetch' },
