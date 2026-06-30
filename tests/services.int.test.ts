@@ -198,6 +198,60 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('service slice (real Postgres)',
     expect(child.ref).toBe(`${KEY}-${child.seq}`);
   });
 
+  test('reparent moves a sub-task to another parent and keeps its ref', async () => {
+    const parentA = await taskService.create({ projectId, title: 'Reparent parent A' });
+    const parentB = await taskService.create({ projectId, title: 'Reparent parent B' });
+    const child = await taskService.addSubtask(parentA.id, 'Movable child');
+    const ref = child.ref;
+
+    const moved = await taskService.reparent(child.id, parentB.id);
+    expect(moved.parentId).toBe(parentB.id);
+    expect(moved.ref).toBe(ref); // ref is stable across a same-project move
+    expect(await taskService.listChildren(parentA.id)).toHaveLength(0);
+    expect(await taskService.listChildren(parentB.id)).toHaveLength(1);
+  });
+
+  test('reparent with null detaches a sub-task to the top level', async () => {
+    const parent = await taskService.create({ projectId, title: 'Detach parent' });
+    const child = await taskService.addSubtask(parent.id, 'Detach me');
+
+    const detached = await taskService.reparent(child.id, null);
+    expect(detached.parentId).toBeNull();
+    expect(detached.ref).toBe(child.ref);
+    const roots = await taskService.list({ projectId });
+    expect(roots.some((t) => t.id === detached.id && !t.parentId)).toBe(true);
+  });
+
+  test('reparent rejects making a task its own parent', async () => {
+    const t = await taskService.create({ projectId, title: 'Self parent' });
+    await expect(taskService.reparent(t.id, t.id)).rejects.toBeInstanceOf(ServiceError);
+  });
+
+  test('reparent rejects a sub-task as the new parent (one level deep)', async () => {
+    const parent = await taskService.create({ projectId, title: 'Depth guard parent' });
+    const child = await taskService.addSubtask(parent.id, 'Depth guard child');
+    const orphan = await taskService.create({ projectId, title: 'Wants a sub-task parent' });
+    await expect(taskService.reparent(orphan.id, child.id)).rejects.toBeInstanceOf(ServiceError);
+  });
+
+  test('reparent rejects moving a task that has its own sub-tasks', async () => {
+    const newParent = await taskService.create({ projectId, title: 'New parent' });
+    const hasKids = await taskService.create({ projectId, title: 'Has kids' });
+    await taskService.addSubtask(hasKids.id, 'A kid');
+    await expect(taskService.reparent(hasKids.id, newParent.id)).rejects.toBeInstanceOf(ServiceError);
+  });
+
+  test('reparent rejects a new parent in a different project', async () => {
+    const other = await projectService.create({ key: 'ZZOTHER', name: 'Other project' });
+    try {
+      const otherParent = await taskService.create({ projectId: other.id, title: 'Foreign parent' });
+      const here = await taskService.create({ projectId, title: 'Stay home' });
+      await expect(taskService.reparent(here.id, otherParent.id)).rejects.toBeInstanceOf(ServiceError);
+    } finally {
+      await db.delete(schema.projects).where(eq(schema.projects.id, other.id));
+    }
+  });
+
   test('module carries icon / state / description', async () => {
     const mod = await moduleService.create({
       projectId,

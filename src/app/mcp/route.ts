@@ -58,6 +58,22 @@ const requireProjectId = async (key: unknown): Promise<string> => {
   return (await projectService.getByKey(key)).id;
 };
 
+/**
+ * Parent changes go through `move_subtask` (it enforces the one-level-deep /
+ * same-project invariants). The generic patch schema silently drops unknown
+ * keys, so a `parent`/`parentId`/`parent_ref` slipped into a patch would no-op
+ * and report success — guard against that confusing silent failure.
+ */
+const PARENT_PATCH_KEYS = ['parent', 'parentId', 'parent_ref'] as const;
+function rejectParentInPatch(patch: unknown): void {
+  if (patch && typeof patch === 'object' && PARENT_PATCH_KEYS.some((k) => k in (patch as Json))) {
+    throw new ServiceError(
+      'bad_request',
+      "to change a task's parent, use move_subtask (update_task does not change parent)",
+    );
+  }
+}
+
 /** Format a thrown validation/service error into a one-line message for clients. */
 function formatError(e: unknown): string {
   if (e instanceof ZodError)
@@ -203,6 +219,23 @@ const TOOLS = (agentUserId: string): Tool[] => [
       slimTask(await taskService.addSubtask(await idFromRef(a.parent_ref), a.title as string, a.status as never, agentUserId)),
   },
   {
+    name: 'move_subtask',
+    description:
+      'Change a task\'s parent. `ref` is the task to move. Pass `parent_ref` (e.g. "SITE-3") to move it under that task as a one-level sub-task, or omit `parent_ref` to detach it back to the top level. The new parent must be a top-level task in the SAME project, and the moved task must not have sub-tasks of its own; cross-project moves are not supported. The ref stays the same. (Parent changes only happen here — `update_task` ignores parent fields.)',
+    inputSchema: {
+      type: 'object',
+      properties: { ref: str(), parent_ref: str() },
+      required: ['ref'],
+    },
+    run: async (a) =>
+      slimTask(
+        await taskService.reparent(
+          await idFromRef(a.ref),
+          a.parent_ref ? await idFromRef(a.parent_ref) : null,
+        ),
+      ),
+  },
+  {
     name: 'list_tasks',
     description: 'List root tasks, optionally filtered. `project` is a project KEY; `status` is a single status.',
     inputSchema: {
@@ -231,19 +264,21 @@ const TOOLS = (agentUserId: string): Tool[] => [
   },
   {
     name: 'update_task',
-    description: 'Patch a task by ref. `patch` may set title, status, priority, moduleId, milestoneId, dueDate, statusNote, description.',
+    description: 'Patch a task by ref. `patch` may set title, status, priority, moduleId, milestoneId, dueDate, statusNote, description. To change a task\'s parent, use move_subtask instead — parent fields here are rejected.',
     inputSchema: {
       type: 'object',
       properties: { ref: str(), patch: { type: 'object' } },
       required: ['ref', 'patch'],
     },
-    run: async (a) =>
-      slimTask(await taskService.update(await idFromRef(a.ref), (a.patch as Json) ?? {})),
+    run: async (a) => {
+      rejectParentInPatch(a.patch);
+      return slimTask(await taskService.update(await idFromRef(a.ref), (a.patch as Json) ?? {}));
+    },
   },
   {
     name: 'update_tasks',
     description:
-      'Bulk-patch tasks in one call. `updates` is a list of { ref, patch }; each `patch` uses camelCase keys (title, status, priority, moduleId, milestoneId, dueDate, statusNote, description). Returns one result per item, in order: { ok: true, ref } or { ok: false, ref, error }.',
+      'Bulk-patch tasks in one call. `updates` is a list of { ref, patch }; each `patch` uses camelCase keys (title, status, priority, moduleId, milestoneId, dueDate, statusNote, description). Parent changes are not allowed here — use move_subtask. Returns one result per item, in order: { ok: true, ref } or { ok: false, ref, error }.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -266,6 +301,7 @@ const TOOLS = (agentUserId: string): Tool[] => [
       for (const it of items) {
         const ref = typeof it.ref === 'string' ? it.ref : null;
         try {
+          rejectParentInPatch(it.patch);
           const t = await taskService.update(await idFromRef(it.ref), (it.patch as Json) ?? {});
           results.push({ ok: true, ref: t.ref });
         } catch (e) {

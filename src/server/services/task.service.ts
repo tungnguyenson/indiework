@@ -224,6 +224,41 @@ export const taskService = {
     return readDto(id);
   },
 
+  /**
+   * Move a task under a different parent, or detach it to the top level.
+   * `newParentId = null` makes the task a root task; otherwise it becomes a
+   * one-level sub-task of `newParentId`. Only `parentId` is rewritten — module
+   * and milestone are inherited once at creation and then owned independently,
+   * so they're left untouched (and same-project keeps their FKs valid).
+   *
+   * To keep the hierarchy one level deep and the ref stable, the new parent
+   * must be a top-level task in the SAME project as the task being moved, and
+   * the task being moved may not have sub-tasks of its own. Cross-project moves
+   * (which would churn the seq/ref) are out of scope.
+   */
+  async reparent(id: string, newParentId: string | null): Promise<TaskDto> {
+    const task = await readDto(id); // 404 if the task is gone
+
+    if (newParentId) {
+      if (newParentId === id) throw badRequest('a task cannot be its own parent');
+      const parent = await readDto(newParentId); // 404 if the new parent is gone
+      if (parent.parentId)
+        throw badRequest('the new parent must be a top-level task (sub-tasks are one level deep)');
+      if ((task.projectId ?? null) !== (parent.projectId ?? null))
+        throw badRequest('the new parent must be in the same project as the task');
+      const kids = await this.listChildren(id);
+      if (kids.length > 0) throw badRequest('cannot re-parent a task that has its own sub-tasks');
+    }
+
+    const [row] = await db
+      .update(schema.tasks)
+      .set({ parentId: newParentId, updatedAt: new Date() })
+      .where(eq(schema.tasks.id, id))
+      .returning({ id: schema.tasks.id });
+    if (!row) throw notFound('task');
+    return readDto(row.id);
+  },
+
   /** Resolve "DISK-3" → the task DTO. */
   async getByRef(ref: string): Promise<TaskDto> {
     const parsed = parseRef(ref);

@@ -83,10 +83,11 @@ curl -s -X POST http://localhost:3000/mcp \
 | `create_task` | `title` | `project`, `module`, `milestone`, `status`, `priority`, `due_date` | Omit `project` → lands in the Inbox. |
 | `create_tasks` | `tasks` | `project` | **Bulk create** in one call. `tasks` is an array of `create_task`-shaped items; `project` is the shared default KEY (omit → all Inbox). Returns one `{ ok, ref, id }` / `{ ok: false, error }` per item — one bad item doesn't abort the rest. |
 | `add_subtask` | `parent_ref`, `title` | `status` | One level deep; inherits the parent's project/module/milestone. Gets its own ref (`KEY-<n>`), so it's patchable like any task. `status` defaults to `todo`. |
+| `move_subtask` | `ref` | `parent_ref` | Change a task's parent. With `parent_ref` → move under that task as a one-level sub-task; omit it → detach back to the top level. New parent must be a **top-level task in the same project**, and the moved task must have no sub-tasks of its own (cross-project moves unsupported). The ref is unchanged. Parent changes happen **only** here — `update_task` rejects parent keys. |
 | `list_tasks` | — | `project`, `status`, `milestone`, `module` | Root tasks only; `status` is a single value. |
 | `get_task` | `ref` | — | e.g. `SITE-3`. Returns the task plus its `children` (sub-tasks, each with its own ref + status) — use this to enumerate sub-tasks. |
-| `update_task` | `ref`, `patch` | — | `patch` may set `title`, `status`, `priority`, `moduleId`, `milestoneId`, `dueDate`, `statusNote`, `description`. |
-| `update_tasks` | `updates` | — | **Bulk patch** in one call. `updates` is an array of `{ ref, patch }` (same `patch` keys as `update_task`). Returns one `{ ok, ref }` / `{ ok: false, ref, error }` per item. |
+| `update_task` | `ref`, `patch` | — | `patch` may set `title`, `status`, `priority`, `moduleId`, `milestoneId`, `dueDate`, `statusNote`, `description`. To change the parent, use `move_subtask` — parent keys in `patch` are rejected. |
+| `update_tasks` | `updates` | — | **Bulk patch** in one call. `updates` is an array of `{ ref, patch }` (same `patch` keys as `update_task`; parent changes not allowed — use `move_subtask`). Returns one `{ ok, ref }` / `{ ok: false, ref, error }` per item. |
 | `add_comment` | `ref`, `body` | — | Appended to the timeline with source `agent`. |
 | `list_comments` | `ref` | — | The task's comment timeline, oldest first. Each row has an `id` (use with `update_comment` / `delete_comment`), `body`, `source` (`web · api · mcp · agent`), `createdAt`, `editedAt` (null until first edit). |
 | `update_comment` | `id`, `body` | — | Edits a comment in place **by its `id`** (from `list_comments` / `add_comment`). Keeps the original `source`, stamps an "edited" badge. |
