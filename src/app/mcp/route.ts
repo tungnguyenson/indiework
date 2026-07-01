@@ -13,10 +13,12 @@ import {
   moduleService,
   commentService,
   workspaceService,
+  attachmentService,
 } from '@/server/services';
 import { requireBearer, MCP_COMMENT_SOURCE } from '@/server/auth/token';
 import { apiRateState } from '@/server/auth/rate-limit';
 import { ServiceError } from '@/server/services';
+import { attachmentBlocks, attachmentView, serializeToolResult } from '@/server/mcp-content';
 import {
   TASK_STATUS,
   TASK_PRIORITY,
@@ -254,12 +256,35 @@ const TOOLS = (agentUserId: string): Tool[] => [
   },
   {
     name: 'get_task',
-    description: 'Get one task by its ref, e.g. "SITE-3". Returns the task plus its `children` (sub-tasks, each with its own ref + status).',
+    description:
+      'Get one task by its ref, e.g. "SITE-3". Returns the task plus its `children` (sub-tasks, each with its own ref + status) and `attachments` (metadata: id, name, type, size, ext, previewable). `attachmentCount` reflects the real count; use `view_attachment` with an attachment id to fetch/see the file.',
     inputSchema: { type: 'object', properties: { ref: str() }, required: ['ref'] },
     run: async (a) => {
       const task = await taskService.getByRef(a.ref as string);
-      const children = await taskService.listChildren(task.id);
-      return { ...task, children: children.map(slimTask) };
+      const [children, attachments] = await Promise.all([
+        taskService.listChildren(task.id),
+        attachmentService.list(task.id),
+      ]);
+      return {
+        ...task,
+        attachmentCount: attachments.length,
+        children: children.map(slimTask),
+        attachments: attachments.map(attachmentView),
+      };
+    },
+  },
+  {
+    name: 'view_attachment',
+    description:
+      "Fetch a task attachment by its `id` (get ids from get_task's `attachments`). Image attachments are returned as an image block so you can see them; other files return metadata only (fetch bytes via the download API).",
+    inputSchema: { type: 'object', properties: { id: str() }, required: ['id'] },
+    run: async (a) => {
+      const id = a.id as string;
+      const meta = await attachmentService.get(id);
+      // Only images with stored bytes are fetchable into a viewable block; skip
+      // the storage read for everything else (attachmentBlocks handles the copy).
+      const opened = meta.type === 'image' && meta.path ? await attachmentService.open(id) : null;
+      return attachmentBlocks(meta, opened);
     },
   },
   {
@@ -622,7 +647,7 @@ async function handleMessage(msg: Json, tools: Tool[]): Promise<Json | null> {
       if (!tool) return rpcError(id, -32602, `Unknown tool: ${name}`);
       try {
         const result = await tool.run((params?.arguments as Json) ?? {});
-        return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
+        return rpcResult(id, serializeToolResult(result));
       } catch (e) {
         return rpcResult(id, { content: [{ type: 'text', text: formatError(e) }], isError: true });
       }
