@@ -64,3 +64,35 @@ export function RefTag({ value, big }: { value: string; big?: boolean }) {
     </button>
   );
 }
+
+/**
+ * Icon button that copies a link to the clipboard, echoing RefTag's copy
+ * micro-interaction (swaps to a check for ~1.1s). `getUrl` is resolved at click
+ * time — not on render — so callers can safely read `window.location.origin`
+ * without breaking SSR. A null url (e.g. an Inbox task with no ref) is a no-op.
+ */
+export function CopyLinkButton({ getUrl, label = 'Copy link' }: { getUrl: () => string | null; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="icon-btn"
+      title={copied ? 'Link copied' : label}
+      aria-label={label}
+      onClick={async (e) => {
+        e.stopPropagation();
+        const url = getUrl();
+        if (!url) return;
+        try {
+          await navigator.clipboard?.writeText(url);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1100);
+        } catch {
+          // Clipboard unavailable (denied permission / insecure context) — skip.
+        }
+      }}
+    >
+      {copied ? <Ic.check size={16} /> : <Ic.link size={16} />}
+    </button>
+  );
+}

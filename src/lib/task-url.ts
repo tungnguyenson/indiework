@@ -47,6 +47,18 @@ export function taskFullPath(ref: string, title: string): string | null {
   return `/app/task/${ref}${slug ? `/${slug}` : ''}`;
 }
 
+/**
+ * Absolute, shareable canonical URL for a task: the origin prefixed onto the
+ * standalone full-page path (`https://…/app/task/IW-11/<slug>`). This is the
+ * link the side-panel "copy link" button writes to the clipboard — the same
+ * `/app/task/…` form the app itself uses for a task's own page. Returns null
+ * for an invalid ref (mirrors `taskFullPath`).
+ */
+export function taskCanonicalUrl(origin: string, ref: string, title: string): string | null {
+  const path = taskFullPath(ref, title);
+  return path === null ? null : `${origin}${path}`;
+}
+
 /** Pull the open task's ref out of a path-based detail URL. */
 export function refFromPath(pathname: string): { ref: string } | null {
   const m = pathname.match(/^\/app\/issue\/([^/]+)/);

@@ -4,7 +4,7 @@ import { useCallback } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { taskPath, refFromPath, projectPathForRef, type OpenableTask } from './task-url';
 
-export { slugify, taskPath, taskFullPath, refFromPath, projectPathForRef, taskKey } from './task-url';
+export { slugify, taskPath, taskFullPath, taskCanonicalUrl, refFromPath, projectPathForRef, taskKey } from './task-url';
 export type { OpenableTask } from './task-url';
 
 /**
