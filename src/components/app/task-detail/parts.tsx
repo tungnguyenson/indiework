@@ -16,6 +16,7 @@ import {
   attachmentUploadErrorMessage,
 } from '@/server/attachment-limits';
 import { previewKind, attachmentDownloadUrl } from '@/lib/attachment-preview';
+import { filesFromClipboard, withPasteName } from '@/lib/clipboard-files';
 import { AttachmentPreview } from './attachment-preview';
 import { commitOnEnter } from '@/lib/inline-edit';
 import { CircleCheck } from '@/components/ui/interactive';
@@ -138,7 +139,7 @@ export function Attachments({ taskId, items, onChanged }: { taskId: string; item
   const [preview, setPreview] = useState<AttachmentItem | null>(null);
   const sizeLimit = attachmentSizeLimitLabel();
 
-  const addFiles = async (files: FileList | null) => {
+  const addFiles = async (files: FileList | File[] | null) => {
     if (!files?.length || uploading) return;
     setError(null);
     setUploading(true);
@@ -167,6 +168,27 @@ export function Attachments({ taskId, items, onChanged }: { taskId: string; item
       if (inputRef.current) inputRef.current.value = '';
     }
   };
+
+  // Paste-to-attach: this section only mounts while a task is open, so a
+  // window-level listener means Cmd/Ctrl+V with an image (or any file) on the
+  // clipboard uploads it here — the familiar "paste a screenshot" shortcut. We
+  // go window-wide rather than binding a focused drop zone so it works from
+  // anywhere in the open task, mirroring drag-drop. A text-only paste yields no
+  // files and falls through untouched to whatever input/editor has focus.
+  const addFilesRef = useRef(addFiles);
+  useEffect(() => {
+    addFilesRef.current = addFiles;
+  });
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const files = filesFromClipboard(e.clipboardData).map(withPasteName);
+      if (!files.length) return;
+      e.preventDefault();
+      void addFilesRef.current(files);
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, []);
 
   return (
     <div className="dp-attach">
@@ -276,7 +298,7 @@ export function Attachments({ taskId, items, onChanged }: { taskId: string; item
             'Uploading…'
           ) : (
             <>
-              Drag files here or <b>browse</b>
+              Drag files here, paste, or <b>browse</b>
               <span className="attach-limit"> · max {sizeLimit}</span>
             </>
           )}

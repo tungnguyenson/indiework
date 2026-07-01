@@ -2,9 +2,9 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { useTaskNav, taskFullPath } from '@/lib/task-nav';
+import { useTaskNav, taskFullPath, taskCanonicalUrl } from '@/lib/task-nav';
 import { MarkdownEditor } from '@/components/ui/markdown-editor';
-import { RefTag } from '@/components/ui/interactive';
+import { RefTag, CopyLinkButton } from '@/components/ui/interactive';
 import { Ic } from '@/components/ui/icons';
 import { useTaskDetail } from './task-detail/use-task-detail';
 import { TitleEditor, StatusNote, Attachments } from './task-detail/parts';
@@ -91,6 +91,9 @@ export function DetailPanel({
       <div className="dp-head">
         {displayRef ? <RefTag value={displayRef} big /> : <span className="ref-tag ref-big">Inbox</span>}
         <span className="spacer" />
+        {fullPath && displayRef && (
+          <CopyLinkButton getUrl={() => taskCanonicalUrl(window.location.origin, displayRef, task.title)} />
+        )}
         {fullPath && (
           <Link className="icon-btn" href={fullPath} title="Open as full page" aria-label="Open as full page">
             <Ic.maximize size={16} />

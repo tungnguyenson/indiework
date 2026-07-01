@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { slugify, taskPath, taskFullPath, refFromPath, projectPathForRef, taskKey } from '@/lib/task-url';
+import { slugify, taskPath, taskFullPath, taskCanonicalUrl, refFromPath, projectPathForRef, taskKey } from '@/lib/task-url';
 
 describe('slugify', () => {
   test('ASCII-folds Vietnamese diacritics (IW-11 target)', () => {
@@ -56,6 +56,24 @@ describe('taskFullPath', () => {
 
   test('returns null for an invalid ref', () => {
     expect(taskFullPath('not-a-ref!', 'x')).toBeNull();
+  });
+});
+
+describe('taskCanonicalUrl', () => {
+  test('prefixes the origin onto the standalone /app/task page path', () => {
+    expect(taskCanonicalUrl('https://app.indiework.space', 'IW-103', 'Nút copy Task canonical URL')).toBe(
+      'https://app.indiework.space/app/task/IW-103/nut-copy-task-canonical-url',
+    );
+  });
+
+  test('omits the slug segment when the title slugs to empty', () => {
+    expect(taskCanonicalUrl('https://app.indiework.space', 'IW-3', '   ')).toBe(
+      'https://app.indiework.space/app/task/IW-3',
+    );
+  });
+
+  test('returns null for an invalid ref', () => {
+    expect(taskCanonicalUrl('https://app.indiework.space', 'not-a-ref!', 'x')).toBeNull();
   });
 });
 
