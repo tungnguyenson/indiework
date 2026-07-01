@@ -4,9 +4,16 @@ import { SESSION_COOKIE, verifySessionValue } from '@/server/auth/session';
 /**
  * Runs at the edge of every HTML document, with two jobs:
  *
- *  1. Auth gate — anything under `/app/*` needs a valid session cookie, else we
- *     redirect to `/login`. The landing (`/`), `/login`, `/api/*` and `/mcp` are
- *     public (API/MCP carry their own Bearer auth) and skip the gate.
+ *  1. Session routing — anything under `/app/*` needs a valid session cookie,
+ *     else we redirect to `/login`. Conversely, an authed visitor landing on the
+ *     marketing page (`/`) is bounced straight to `/app`, so a logged-in user
+ *     never has to re-enter through `/login` to be recognised. Both use the same
+ *     signature+expiry check (`verifySessionValue`, no DB lookup) as `/login`, so
+ *     the three never disagree and loop; a signature-valid-but-DB-stale cookie is
+ *     caught downstream by the app layout's `withFreshSession`. `/login`, `/api/*`
+ *     and `/mcp` stay public (API/MCP carry their own Bearer auth). The landing is
+ *     still served to anonymous visitors — a missing cookie short-circuits before
+ *     any crypto, so they never pay the verify.
  *
  *  2. Per-request CSP — emit a fresh nonce and a strict Content-Security-Policy
  *     built around it. Next auto-applies the nonce to its own framework/bundle
@@ -17,13 +24,23 @@ import { SESSION_COOKIE, verifySessionValue } from '@/server/auth/session';
  * Next 16 `proxy` runs on the Node runtime, so the Web Crypto session check works.
  */
 export async function proxy(req: NextRequest) {
-  // 1) Auth gate for the app shell only.
-  if (req.nextUrl.pathname.startsWith('/app')) {
+  // 1) Session routing. Gate the app shell; conversely, bounce an already-authed
+  //    visitor off the landing page into the app. An anonymous visitor (no
+  //    cookie) short-circuits inside verifySessionValue, so `/` stays free.
+  const { pathname } = req.nextUrl;
+  if (pathname.startsWith('/app')) {
     const ok = await verifySessionValue(req.cookies.get(SESSION_COOKIE)?.value);
     if (!ok) {
       const url = req.nextUrl.clone();
       url.pathname = '/login';
-      url.searchParams.set('next', req.nextUrl.pathname);
+      url.searchParams.set('next', pathname);
+      return NextResponse.redirect(url);
+    }
+  } else if (pathname === '/') {
+    const ok = await verifySessionValue(req.cookies.get(SESSION_COOKIE)?.value);
+    if (ok) {
+      const url = req.nextUrl.clone();
+      url.pathname = '/app';
       return NextResponse.redirect(url);
     }
   }

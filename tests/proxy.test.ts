@@ -33,6 +33,24 @@ describe('proxy — auth gate', () => {
     expect(csp).toContain("'strict-dynamic'");
     expect(csp).toContain("object-src 'none'");
   });
+
+  test('bounces an authed visitor off the landing page straight to /app', async () => {
+    const res = await proxy(reqFor('/', await createSessionValue('test-user-id')));
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toContain('/app');
+  });
+
+  test('serves the landing page (no redirect) to an anonymous visitor', async () => {
+    const res = await proxy(reqFor('/'));
+    expect(res.headers.get('location')).toBeNull();
+    expect(res.headers.get('content-security-policy')).toContain("frame-ancestors 'none'");
+  });
+
+  test('serves the landing page when the session cookie is invalid/expired', async () => {
+    const res = await proxy(reqFor('/', 'not-a-valid-signed-session'));
+    expect(res.headers.get('location')).toBeNull();
+    expect(res.headers.get('content-security-policy')).toContain("frame-ancestors 'none'");
+  });
 });
 
 describe('proxy — CSP nonce', () => {
