@@ -2,7 +2,7 @@
 
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
-import { workspaceService } from '@/server/services';
+import { workspaceService, memberService } from '@/server/services';
 import { requireSession } from '@/server/auth/require-session';
 import { WORKSPACE_COOKIE } from '@/server/active-workspace';
 import type { CreateWorkspaceInput, UpdateWorkspaceInput } from '@/server/validators/workspace';
@@ -30,8 +30,12 @@ export async function setActiveWorkspace(id: string) {
 }
 
 export async function createWorkspace(input: CreateWorkspaceInput) {
-  await requireSession();
+  const userId = await requireSession();
   const ws = await workspaceService.create(input);
+  // The creator must become a member (owner), or the new workspace is invisible:
+  // the switcher and resolveActiveWorkspace list the user's memberships, never
+  // all workspace rows, so a membership-less workspace can't be seen or switched to.
+  await memberService.ensureMembership(userId, ws.id, 'owner');
   // Drop the user straight into the new workspace so the switch is visible.
   await setWorkspaceCookie(ws.id);
   refresh();
