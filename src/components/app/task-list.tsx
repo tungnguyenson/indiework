@@ -13,6 +13,7 @@ import {
   type Filters,
   type FieldVis,
   type BoardCfg,
+  type TaskOrdering,
   type Section as Sec,
   type GroupModule,
   type GroupMilestone,
@@ -67,6 +68,7 @@ interface DisplayState {
   groupBy: GroupDim;
   subGroupBy: GroupDim;
   groupStyle: GroupStyle;
+  sort: TaskOrdering;
   filters: Filters;
   statusOrder: TaskStatus[];
   statusHidden: TaskStatus[];
@@ -123,6 +125,7 @@ export function ProjectView({
     groupBy: availDims[0] ?? 'status',
     subGroupBy: 'none',
     groupStyle: 'band',
+    sort: 'priority',
     filters: DEFAULT_FILTERS,
     statusOrder: [],
     statusHidden: [],
@@ -183,8 +186,9 @@ export function ProjectView({
       statusOrder: disp.statusOrder,
       statusHidden: disp.statusHidden,
       allowedStatus,
+      sort: disp.sort ?? 'priority',
     }),
-    [rootTasks, effPrimary, effSecondary, filters, modules, milestones, disp.statusOrder, disp.statusHidden, allowedStatus],
+    [rootTasks, effPrimary, effSecondary, filters, modules, milestones, disp.statusOrder, disp.statusHidden, disp.sort, allowedStatus],
   );
   const visibleSections = sections.filter((s) => s.tasks.length > 0 || s.keep);
   const anyTasks = sections.some((s) => s.tasks.length > 0);
@@ -305,6 +309,8 @@ export function ProjectView({
                 setSubGroupBy={(d) => setDisp((s) => ({ ...s, subGroupBy: d }))}
                 groupStyle={disp.groupStyle ?? 'band'}
                 setGroupStyle={(g) => setDisp((s) => ({ ...s, groupStyle: g }))}
+                sort={disp.sort ?? 'priority'}
+                setSort={(o) => setDisp((s) => ({ ...s, sort: o }))}
                 availDims={availDims}
                 filters={filters}
                 setFilters={(f) => setDisp((s) => ({ ...s, filters: f }))}

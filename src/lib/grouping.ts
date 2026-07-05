@@ -121,6 +121,8 @@ export interface GroupOpts {
   statusOrder?: TaskStatus[];
   statusHidden?: TaskStatus[];
   allowedStatus?: (s: TaskStatus) => boolean;
+  /** Within-group task ordering; defaults to `priority` (the smart sort). */
+  sort?: TaskOrdering;
 }
 
 function groupSpec(
@@ -205,12 +207,36 @@ function groupSpec(
   return null;
 }
 
-function sortTasks(a: TaskDto, b: TaskDto): number {
-  return (
-    Number(a.done) - Number(b.done) ||
-    TASK_PRIORITY_RANK[b.priority] - TASK_PRIORITY_RANK[a.priority] ||
-    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-  );
+/**
+ * Within-group task ordering, shared by list sections and board columns.
+ * `priority` is the default smart sort (done sinks, then higher priority, then
+ * oldest); `updated`/`created` are the "recents" sorts (most-recent first).
+ */
+export type TaskOrdering = 'priority' | 'updated' | 'created' | 'due' | 'title';
+
+export const DEFAULT_TASK_ORDERING: TaskOrdering = 'priority';
+
+export function taskComparator(ordering: TaskOrdering): (a: TaskDto, b: TaskDto) => number {
+  switch (ordering) {
+    case 'updated':
+      return (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    case 'created':
+      return (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    case 'due':
+      return (a, b) => {
+        const av = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+        const bv = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+        return av - bv || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      };
+    case 'title':
+      return (a, b) => a.title.localeCompare(b.title);
+    case 'priority':
+    default:
+      return (a, b) =>
+        Number(a.done) - Number(b.done) ||
+        TASK_PRIORITY_RANK[b.priority] - TASK_PRIORITY_RANK[a.priority] ||
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  }
 }
 
 export function buildSections(
@@ -235,16 +261,17 @@ export function buildSections(
     return true;
   };
   const ptasks = tasks.filter(pass);
+  const cmp = taskComparator(opts.sort ?? DEFAULT_TASK_ORDERING);
 
   const primGroups = groupSpec(primary, modules, milestones, opts);
   if (!primGroups) {
-    return [{ id: '__all', name: '', defaultOpen: true, keep: true, patch: {}, tasks: ptasks.slice().sort(sortTasks) }];
+    return [{ id: '__all', name: '', defaultOpen: true, keep: true, patch: {}, tasks: ptasks.slice().sort(cmp) }];
   }
 
   const subDim = secondary !== 'none' && secondary !== primary ? secondary : null;
 
   return primGroups.map((g) => {
-    const groupTasks = ptasks.filter(g.match).sort(sortTasks);
+    const groupTasks = ptasks.filter(g.match).sort(cmp);
     const sec: Section = {
       id: g.key,
       name: g.name,
@@ -280,7 +307,7 @@ export function buildSections(
 
 // ============================ Board (configurable) ============================
 
-export type BoardOrdering = 'priority' | 'created' | 'due' | 'title';
+export type BoardOrdering = TaskOrdering;
 
 export interface BoardCfg {
   columns: GroupDim; // dimension for columns
@@ -326,21 +353,5 @@ export function boardBuckets(dim: GroupDim, modules: GroupModule[], milestones: 
 }
 
 export function sortBoardCards(ordering: BoardOrdering): (a: TaskDto, b: TaskDto) => number {
-  switch (ordering) {
-    case 'created':
-      return (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-    case 'title':
-      return (a, b) => a.title.localeCompare(b.title);
-    case 'due':
-      return (a, b) => {
-        const av = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
-        const bv = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
-        return av - bv || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      };
-    case 'priority':
-    default:
-      return (a, b) =>
-        TASK_PRIORITY_RANK[b.priority] - TASK_PRIORITY_RANK[a.priority] ||
-        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-  }
+  return taskComparator(ordering);
 }

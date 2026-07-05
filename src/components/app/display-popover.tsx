@@ -13,7 +13,7 @@ import {
   type TaskStatus,
   type TaskPriority,
 } from '@/lib/domain';
-import type { GroupDim, GroupStyle, Filters, FieldVis, BoardCfg, BoardOrdering, GroupModule, GroupMilestone } from '@/lib/grouping';
+import type { GroupDim, GroupStyle, Filters, FieldVis, BoardCfg, BoardOrdering, TaskOrdering, GroupModule, GroupMilestone } from '@/lib/grouping';
 import type { ViewMode } from '@/lib/views';
 
 const DIM_LABEL: Record<GroupDim, string> = {
@@ -57,6 +57,8 @@ export interface DisplayProps {
   setSubGroupBy: (d: GroupDim) => void;
   groupStyle: GroupStyle;
   setGroupStyle: (g: GroupStyle) => void;
+  sort: TaskOrdering;
+  setSort: (o: TaskOrdering) => void;
   availDims: GroupDim[];
   filters: Filters;
   setFilters: (f: Filters) => void;
@@ -67,11 +69,12 @@ export interface DisplayProps {
 }
 
 export function DisplayPopover(props: DisplayProps) {
-  const { groupBy, subGroupBy, groupStyle, availDims, filters, statusHidden } = props;
+  const { groupBy, subGroupBy, groupStyle, sort, availDims, filters, statusHidden } = props;
   const dirty =
     groupBy !== (availDims[0] ?? 'status') ||
     subGroupBy !== 'none' ||
     groupStyle !== 'band' ||
+    sort !== 'priority' ||
     filters.hideDone ||
     filters.showSubtasks ||
     statusHidden.length > 0 ||
@@ -96,7 +99,7 @@ export function DisplayPopover(props: DisplayProps) {
 
 function DisplayBody(props: DisplayProps) {
   const [screen, setScreen] = useState<'main' | 'order'>('main');
-  const { mode, setMode, groupBy, setGroupBy, subGroupBy, setSubGroupBy, groupStyle, setGroupStyle, availDims, filters, setFilters } = props;
+  const { mode, setMode, groupBy, setGroupBy, subGroupBy, setSubGroupBy, groupStyle, setGroupStyle, sort, setSort, availDims, filters, setFilters } = props;
 
   if (screen === 'order') {
     return <GroupOrder {...props} onBack={() => setScreen('main')} />;
@@ -138,6 +141,16 @@ function DisplayBody(props: DisplayProps) {
               {['none' as GroupDim, ...availDims.filter((d) => d !== groupBy)].map((d) => (
                 <option key={d} value={d}>
                   {DIM_LABEL[d]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="dp-row">
+            <span className="dp-row-lbl">Sort</span>
+            <select className="dp-dd" value={sort} onChange={(e) => setSort(e.target.value as TaskOrdering)}>
+              {(Object.keys(ORDERING_LABEL) as TaskOrdering[]).map((o) => (
+                <option key={o} value={o}>
+                  {ORDERING_LABEL[o]}
                 </option>
               ))}
             </select>
@@ -248,9 +261,10 @@ function GroupOrder({
   );
 }
 
-const ORDERING_LABEL: Record<BoardOrdering, string> = {
+const ORDERING_LABEL: Record<TaskOrdering, string> = {
   priority: 'Priority',
-  created: 'Created',
+  updated: 'Recently updated',
+  created: 'Recently created',
   due: 'Due date',
   title: 'Title',
 };
