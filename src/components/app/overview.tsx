@@ -33,6 +33,7 @@ import {
 } from '@/app/_actions/structure';
 import { ProjectTabs } from './project-tabs';
 import { useViews } from '@/lib/views';
+import { useRecordLastView } from '@/lib/last-view';
 import { useRun } from '@/components/ui/toast';
 import { Progress } from '@/components/ui/bits';
 import { IconPicker } from '@/components/ui/icon-picker';
@@ -93,6 +94,7 @@ export function OverviewScreen({
 }) {
   const [tab, setTab] = useState<OvTab>('info');
   const views = useViews(project.key);
+  useRecordLastView(project.key, 'overview'); // IW-109: remember overview as the last view
 
   return (
     <>

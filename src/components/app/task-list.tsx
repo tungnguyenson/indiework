@@ -27,8 +27,9 @@ import {
   type TaskStatus,
   type TaskPriority,
 } from '@/lib/domain';
-import { DEFAULT_VIEW, viewAllowsStatus, viewCaptureStatus, useViews, type ViewId } from '@/lib/views';
+import { BUILTIN_VIEWS, DEFAULT_VIEW, viewAllowsStatus, viewCaptureStatus, useViews, type ViewId } from '@/lib/views';
 import { useLocalStorage } from '@/lib/use-local-storage';
+import { readLastView, writeLastView } from '@/lib/last-view';
 import { useReconciledTasks } from '@/lib/use-reconciled-tasks';
 import { useTaskNav, useOpenTaskKey, taskKey } from '@/lib/task-nav';
 import { useOptimisticRun, useReconcileRun, useRun } from '@/components/ui/toast';
@@ -111,14 +112,34 @@ export function ProjectView({
   const params = useSearchParams();
   const { openTask } = useTaskNav();
   const openKey = useOpenTaskKey();
-  const activeView = (params.get('view') as ViewId) || DEFAULT_VIEW;
+  const viewParam = params.get('view');
+  const activeView = (viewParam as ViewId) || DEFAULT_VIEW;
 
   const views = useViews(project.key);
   const mode = views.modeFor(activeView);
+  const { customViews } = views;
 
   useEffect(() => {
     migrateLegacyViewStorage(project.key);
   }, [project.key]);
+
+  // IW-109: on a bare project URL (no `?view=`), restore the last-opened view.
+  // Only known views redirect — a deleted custom view falls back to the default.
+  useEffect(() => {
+    if (viewParam) return; // an explicit URL view wins
+    const last = readLastView(project.key);
+    if (!last || last === DEFAULT_VIEW) return; // already showing the default
+    const known =
+      last === 'overview' || BUILTIN_VIEWS.some((v) => v.id === last) || customViews.some((v) => v.id === last);
+    if (!known) return;
+    const base = `/app/p/${project.key}`;
+    router.replace(last === 'overview' ? `${base}/overview` : `${base}?view=${last}`, { scroll: false });
+  }, [viewParam, project.key, customViews, router]);
+
+  // Persist the view the user actually landed on so the next bare visit restores it.
+  useEffect(() => {
+    if (viewParam) writeLastView(project.key, viewParam);
+  }, [viewParam, project.key]);
 
   const availDims = useMemo(() => computeAvailDims(modules, milestones), [modules, milestones]);
   const defaultDisplay: DisplayState = {
