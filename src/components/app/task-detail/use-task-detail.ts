@@ -20,6 +20,7 @@ import {
   deleteTask,
   addSubtask,
   toggleTaskDone,
+  convertSubtaskToTask,
 } from '@/app/_actions/tasks';
 import { toggledDone } from '@/lib/optimistic';
 import { useRun } from '@/components/ui/toast';
@@ -191,6 +192,23 @@ export function useTaskDetail({
     [reload, run],
   );
 
+  /**
+   * Promote a sub-task to a standalone task (detach from its parent). Resolves
+   * `true` on success. Reloads so the surface reflects the new shape: the
+   * "Sub-task of…" link goes away and the sub-tasks section appears.
+   */
+  const convertToTask = useCallback(() => {
+    if (!detail) return Promise.resolve(undefined);
+    return run(
+      async () => {
+        await convertSubtaskToTask(detail.task.id);
+        await reload();
+        return true as const;
+      },
+      { error: "Couldn't convert this sub-task.", retry: false },
+    );
+  }, [detail, reload, run]);
+
   /** Delete the task. Resolves `true` on success; navigation is the caller's concern. */
   const remove = useCallback(() => {
     if (!detail) return Promise.resolve(undefined);
@@ -216,6 +234,7 @@ export function useTaskDetail({
     editComment,
     addChild,
     toggleChild,
+    convertToTask,
     remove,
   };
 }

@@ -252,6 +252,33 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('service slice (real Postgres)',
     }
   });
 
+  test('convertToTask detaches a sub-task, keeping its ref, attributes, and comments', async () => {
+    const mod = await moduleService.create({ projectId, name: 'Convert engine', icon: 'cube', state: 'active' });
+    const parent = await taskService.create({ projectId, title: 'Convert parent', moduleId: mod.id });
+    const child = await taskService.addSubtask(parent.id, 'Promote me', 'in_progress');
+    await commentService.add({ taskId: child.id, body: 'a note that must survive' });
+
+    const promoted = await taskService.convertToTask(child.id);
+    expect(promoted.parentId).toBeNull();
+    expect(promoted.ref).toBe(child.ref); // ref preserved
+    expect(promoted.moduleId).toBe(mod.id); // inherited attribute preserved
+    expect(promoted.status).toBe('in_progress'); // status preserved
+
+    // It's now a root task…
+    const roots = await taskService.list({ projectId });
+    expect(roots.some((t) => t.id === promoted.id && !t.parentId)).toBe(true);
+    expect(await taskService.listChildren(parent.id)).toHaveLength(0);
+
+    // …and its comment timeline carried over untouched (comments key on the task id).
+    const comments = await commentService.list(promoted.id);
+    expect(comments.map((c) => c.body)).toContain('a note that must survive');
+  });
+
+  test('convertToTask rejects a task that is not a sub-task', async () => {
+    const root = await taskService.create({ projectId, title: 'Already top-level' });
+    await expect(taskService.convertToTask(root.id)).rejects.toBeInstanceOf(ServiceError);
+  });
+
   test('module carries icon / state / description', async () => {
     const mod = await moduleService.create({
       projectId,

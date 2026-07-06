@@ -238,6 +238,13 @@ const TOOLS = (agentUserId: string): Tool[] => [
       ),
   },
   {
+    name: 'convert_subtask_to_task',
+    description:
+      'Convert a sub-task into a standalone top-level task. `ref` is the sub-task (e.g. "SITE-15"). It just detaches the task from its parent — the ref stays the same and every attribute, comment, and attachment is preserved. Errors if `ref` is not currently a sub-task. (This is the named shortcut for move_subtask with no parent_ref.)',
+    inputSchema: { type: 'object', properties: { ref: str() }, required: ['ref'] },
+    run: async (a) => slimTask(await taskService.convertToTask(await idFromRef(a.ref))),
+  },
+  {
     name: 'list_tasks',
     description: 'List root tasks, optionally filtered. `project` is a project KEY; `status` is a single status.',
     inputSchema: {

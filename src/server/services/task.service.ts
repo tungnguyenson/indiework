@@ -259,6 +259,20 @@ export const taskService = {
     return readDto(row.id);
   },
 
+  /**
+   * Convert a sub-task into a standalone top-level task. This only detaches it
+   * from its parent (`parentId → null`); everything else is left in place. A
+   * sub-task is already a first-class task — it owns its `seq`/ref, and its
+   * comments and attachments are keyed on its own id — so the ref stays the same
+   * and every attribute, comment, and attachment carries over untouched.
+   * Rejects a task that isn't currently a sub-task.
+   */
+  async convertToTask(id: string): Promise<TaskDto> {
+    const task = await readDto(id); // 404 if the task is gone
+    if (!task.parentId) throw badRequest('this task is already a top-level task (not a sub-task)');
+    return this.reparent(id, null);
+  },
+
   /** Resolve "DISK-3" → the task DTO. */
   async getByRef(ref: string): Promise<TaskDto> {
     const parsed = parseRef(ref);

@@ -198,6 +198,18 @@
 .del-confirm .yes { background: var(--st-danger); color: #fff; }
 .del-confirm .no { background: var(--bg-active); color: var(--text); }
 
+/* Convert sub-task → standalone task. In the panel foot (a flex row) the auto
+   right margin pushes Delete to the far edge; harmless in the page's column foot. */
+.convert-btn { display: inline-flex; align-items: center; gap: 7px; margin-right: auto; border: 1px solid var(--border-soft);
+  background: none; color: var(--text-muted); font-size: 13px; font-weight: 530; padding: 7px 12px; border-radius: var(--r-sm); transition: .12s; }
+.convert-btn:hover { color: var(--text-strong); border-color: var(--border); background: var(--bg-hover); }
+.convert-btn svg { color: var(--text-faint); flex: none; transition: .12s; }
+.convert-btn:hover svg { color: var(--accent); }
+.convert-confirm { display: inline-flex; align-items: center; gap: 8px; margin-right: auto; font-size: 13px; color: var(--text); }
+.convert-confirm button { border: none; border-radius: var(--r-sm); padding: 6px 11px; font-size: 12.5px; font-weight: 600; }
+.convert-confirm .yes { background: var(--accent); color: #fff; }
+.convert-confirm .no { background: var(--bg-active); color: var(--text); }
+
 /* ---------- Standalone task page (2-column, Linear-style) ---------- */
 /* Fills the main column and scrolls on its own; the inner grid is centered with
    a max-width so the page reads as an intentional document, not a full-bleed
@@ -229,7 +241,11 @@
 .prop-rail .prop-label { padding: 11px 0 3px; }
 .prop-rail .prop-val { margin: 0 -9px; }
 .prop-rail .prop-control { width: 100%; justify-content: flex-start; }
-.tp-side-foot { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border-soft); }
+.tp-side-foot { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border-soft);
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+/* The convert button's auto right margin is a row-only trick; neutralise it when
+   the foot stacks vertically so the button keeps its natural width. */
+.tp-side-foot .convert-btn, .tp-side-foot .convert-confirm { margin-right: 0; }
 
 .tp-empty { max-width: 1080px; margin: 0 auto; padding: 60px 32px; color: var(--text-muted); font-size: 14px; }
 

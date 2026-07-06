@@ -64,6 +64,14 @@ export async function addSubtask(parentId: string, title: string) {
   return task;
 }
 
+/** Detach a sub-task into a standalone task (keeps its ref, attributes, comments). */
+export async function convertSubtaskToTask(id: string) {
+  await requireSession();
+  const task = await taskService.convertToTask(id);
+  refresh();
+  return task;
+}
+
 export async function setTaskStatusNote(id: string, note: string) {
   await requireSession();
   const task = await taskService.setStatusNote(id, { note });

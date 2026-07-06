@@ -340,6 +340,39 @@ export function TaskActivity({
   );
 }
 
+/**
+ * Convert a sub-task into a standalone task, with an inline confirm. Render only
+ * for sub-tasks. Detaching keeps the ref, every attribute, and the comment
+ * timeline — it just lifts the task to the top level. The confirm guards it
+ * because there's no one-click "re-attach" in the UI to undo an accidental click.
+ */
+export function ConvertToTaskControl({ onConvert }: { onConvert: () => Promise<void> }) {
+  const [confirm, setConfirm] = useState(false);
+  if (confirm) {
+    return (
+      <span className="convert-confirm">
+        Make this a standalone task?
+        <button className="yes" onClick={onConvert}>
+          Convert
+        </button>
+        <button className="no" onClick={() => setConfirm(false)}>
+          Cancel
+        </button>
+      </span>
+    );
+  }
+  return (
+    <button
+      className="convert-btn"
+      type="button"
+      onClick={() => setConfirm(true)}
+      title="Detach this sub-task into a standalone task — keeps its ref, attributes, and comments"
+    >
+      <Ic.arrowUp size={15} /> Convert to task
+    </button>
+  );
+}
+
 /** Delete control with inline confirm. Navigation after delete is the caller's. */
 export function DeleteControl({ onDelete }: { onDelete: () => Promise<void> }) {
   const [confirmDel, setConfirmDel] = useState(false);

@@ -19,11 +19,11 @@ import { Ic } from '@/components/ui/icons';
 import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import { useTaskDetail } from './task-detail/use-task-detail';
 import { TitleEditor, StatusNote, Attachments } from './task-detail/parts';
-import { ParentLink, TaskProperties, TaskSubtasks, TaskActivity, DeleteControl } from './task-detail/sections';
+import { ParentLink, TaskProperties, TaskSubtasks, TaskActivity, ConvertToTaskControl, DeleteControl } from './task-detail/sections';
 
 export function TaskPageView({ taskRef, initialDetail }: { taskRef: string; initialDetail: TaskDetail }) {
   const router = useRouter();
-  const { detail, missing, loadError, patch, saveStatusNote, addComment, editComment, addChild, toggleChild, remove, reload } = useTaskDetail({
+  const { detail, missing, loadError, patch, saveStatusNote, addComment, editComment, addChild, toggleChild, convertToTask, remove, reload } = useTaskDetail({
     taskRef,
     taskId: null,
     initialDetail,
@@ -133,6 +133,14 @@ export function TaskPageView({ taskRef, initialDetail }: { taskRef: string; init
           <p className="dp-section-label tp-side-label">Properties</p>
           <TaskProperties detail={detail} patch={patch} layout="rail" />
           <div className="tp-side-foot">
+            {task.parentId && (
+              <ConvertToTaskControl
+                key={`conv-${task.id}`}
+                onConvert={async () => {
+                  await convertToTask();
+                }}
+              />
+            )}
             <DeleteControl
               onDelete={async () => {
                 if (await remove()) router.push(projectPath ?? '/app');

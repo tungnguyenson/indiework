@@ -8,7 +8,7 @@ import { RefTag, CopyLinkButton } from '@/components/ui/interactive';
 import { Ic } from '@/components/ui/icons';
 import { useTaskDetail } from './task-detail/use-task-detail';
 import { TitleEditor, StatusNote, Attachments } from './task-detail/parts';
-import { ParentLink, TaskProperties, TaskSubtasks, TaskActivity, DeleteControl } from './task-detail/sections';
+import { ParentLink, TaskProperties, TaskSubtasks, TaskActivity, ConvertToTaskControl, DeleteControl } from './task-detail/sections';
 
 /**
  * Slide-in inspector (1-column overlay). Shares its fetch/mutations (the hook)
@@ -26,7 +26,7 @@ export function DetailPanel({
   onClose: () => void;
 }) {
   const { openTask } = useTaskNav();
-  const { detail, missing, loadError, patch, saveStatusNote, addComment, editComment, addChild, toggleChild, remove, reload } = useTaskDetail({
+  const { detail, missing, loadError, patch, saveStatusNote, addComment, editComment, addChild, toggleChild, convertToTask, remove, reload } = useTaskDetail({
     taskRef,
     taskId,
   });
@@ -132,8 +132,16 @@ export function DetailPanel({
 
       <div className="dp-foot">
         {/* Keyed per task: the panel never remounts on task switch, so without
-            this the inline delete-confirm would persist across switches and a
-            stray confirm could fire against the newly-opened task. */}
+            this the inline confirm would persist across switches and a stray
+            confirm could fire against the newly-opened task. */}
+        {task.parentId && (
+          <ConvertToTaskControl
+            key={`conv-${task.id}`}
+            onConvert={async () => {
+              await convertToTask();
+            }}
+          />
+        )}
         <DeleteControl
           key={task.id}
           onDelete={async () => {
