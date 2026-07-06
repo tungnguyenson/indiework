@@ -293,6 +293,10 @@ export function ProjectView({
     setSelected(new Set());
     lastSel.current = null;
   };
+  // TVR-258: select every task currently in view (across sections, incl. collapsed
+  // ones — orderedIds already spans them). Sub-tasks aren't selectable, so root-only.
+  const selectAll = () => setSelected(new Set(orderedIds));
+  const allSelected = orderedIds.length > 0 && orderedIds.every((id) => selected.has(id));
   const selMode = selected.size > 0;
 
   return (
@@ -404,6 +408,8 @@ export function ProjectView({
       {selMode && (
         <BulkBar
           count={selected.size}
+          allSelected={allSelected}
+          onSelectAll={selectAll}
           modules={modules}
           milestones={milestones}
           onSetStatus={(status) => {
@@ -616,6 +622,8 @@ function InlineAdd({ onAdd }: { onAdd: (title: string) => Promise<unknown> | voi
 
 function BulkBar({
   count,
+  allSelected,
+  onSelectAll,
   modules,
   milestones,
   onSetStatus,
@@ -627,6 +635,8 @@ function BulkBar({
   onClear,
 }: {
   count: number;
+  allSelected: boolean;
+  onSelectAll: () => void;
   modules: GroupModule[];
   milestones: GroupMilestone[];
   onSetStatus: (s: TaskStatus) => void;
@@ -642,6 +652,11 @@ function BulkBar({
       <span className="bulkbar-count">
         <b>{count}</b> selected
       </span>
+      {!allSelected && (
+        <button className="bulkbar-btn" type="button" onClick={onSelectAll}>
+          <Ic.listChecks size={15} /> Select all
+        </button>
+      )}
       <span className="bulkbar-sep" />
       <Popover
         width={190}
