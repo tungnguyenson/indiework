@@ -200,11 +200,10 @@
 .grp-pick[data-empty]:hover { color: var(--text-strong); background: var(--bg-hover); }
 
 /* ---------- Quick capture ---------- */
-.qcap { margin: 0 22px 8px; }
+.qcap { margin: 12px 22px 8px; }
 .qcap-inner { display: flex; align-items: center; gap: 11px; background: var(--bg-surface);
-  border: 1px solid var(--border); border-radius: var(--r-md); padding: 11px 14px; transition: .14s;
-  box-shadow: var(--shadow-sm); }
-.qcap-inner:focus-within { border-color: var(--accent-ring); box-shadow: 0 0 0 3px var(--accent-softer), var(--shadow-sm); }
+  border: 1px solid var(--border); border-radius: var(--r-md); padding: 11px 14px; transition: .14s; }
+.qcap-inner:focus-within { border-color: var(--accent-ring); box-shadow: 0 0 0 3px var(--accent-softer); }
 .qcap-plus { color: var(--accent); display: grid; place-items: center; flex: none; }
 .qcap input { border: none; background: none; outline: none; flex: 1; font-size: 14.5px; color: var(--text-strong); }
 .qcap input::placeholder { color: var(--text-faint); }
