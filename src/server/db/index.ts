@@ -50,23 +50,30 @@ let activePool: Pool | undefined;
 let activeClient: LibsqlClient | undefined;
 
 function createPgDb(): DbClient {
+  // Vercel (and similar serverless) spins many short-lived instances. Keep the
+  // per-instance pool tiny and pair it with Supabase's transaction pooler
+  // (:6543) so we don't exhaust session-mode slots (EMAXCONNSESSION).
+  // Long-running hosts (VPS/Docker/local) can share a larger pool.
+  const isServerless = Boolean(process.env.VERCEL);
   const pool =
     globalForDb.__iwPool ??
     new Pool({
       connectionString: env.DATABASE_URL,
-      max: 10,
+      max: isServerless ? 1 : 10,
       // Keep TCP alive so idle connections aren't silently dropped (common
       // behind Docker/NAT on macOS), which otherwise surfaces as a one-off
       // "Connection terminated unexpectedly".
       keepAlive: true,
-      idleTimeoutMillis: 30_000,
+      idleTimeoutMillis: isServerless ? 5_000 : 30_000,
     });
 
   // Swallow background pool errors so a dropped idle client is evicted and
   // recycled instead of crashing the process.
   pool.on('error', (err) => console.error('[db] idle client error:', err.message));
 
-  if (env.NODE_ENV !== 'production') globalForDb.__iwPool = pool;
+  // Cache on globalThis in every env so warm serverless isolates reuse the
+  // single client instead of opening a new one per module evaluation.
+  globalForDb.__iwPool = pool;
   activePool = pool;
 
   return drizzlePg(pool, { schema: pgSchema });
