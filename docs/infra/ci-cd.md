@@ -30,7 +30,11 @@ Mỗi `git push` lên `main`:
    set sẵn 4 biến môi trường (`DATABASE_URL`, `APP_PASSWORD`, `COOKIE_SECRET`,
    `API_TOKEN`) mà `src/server/env.ts` yêu cầu. Fail là dừng, không deploy.
 2. **build** — build từ `docker/Dockerfile`, push GHCR 2 tag: `:latest` và `:<git-sha>`.
-3. **deploy** — SSH vào VPS: `docker compose -f compose.prod.yml pull && up -d`.
+3. **deploy** — `ssh ci-indiework@<VPS> <sha>`. Key này bị khoá bằng `command=` trong
+   `authorized_keys`: không có shell, không phải root, chỉ chạy được `indiework-deploy <sha>`
+   (repo `vps/ansible`, `roles/app_deploy`). Script đó kiểm tra commit có trên `main`, pull
+   `:<sha>`, chỉ khởi động lại `app` + `demo` khi image đổi, đợi cả hai trả lời, không lên thì
+   đưa image cũ về. Log trên VPS: `/var/log/app-deploy/indiework.log`.
 
 Pull request vào `main` chỉ chạy **ci**. Migration vẫn tự chạy trong entrypoint của
 image lúc `up -d` (giống deploy thủ công).
@@ -62,11 +66,14 @@ image lúc `up -d` (giống deploy thủ công).
 
 Repo → Settings → Secrets and variables → Actions:
 
-| Secret        | Giá trị                                                       |
-| ------------- | ------------------------------------------------------------ |
-| `VPS_HOST`    | IP hoặc domain VPS                                            |
-| `VPS_USER`    | user SSH                                                      |
-| `VPS_SSH_KEY` | **private key** của deploy key cho user đó                    |
+| Loại     | Tên                  | Giá trị                                                                 |
+| -------- | -------------------- | ----------------------------------------------------------------------- |
+| Secret   | `DEPLOY_SSH_KEY`     | private key của `indiework-ci-deploy` (user `ci-indiework` trên VPS)     |
+| Variable | `DEPLOY_HOST`        | IP VPS                                                                  |
+| Variable | `DEPLOY_KNOWN_HOSTS` | dòng host key ed25519 của VPS (`ssh-keyscan -t ed25519 <IP>` từ máy đã tin VPS) |
+
+User, script và `authorized_keys` trên VPS do `ansible-playbook playbooks/app-deploy.yml` trong
+repo `vps/ansible` tạo.
 
 `GITHUB_TOKEN` (push image lúc build) là token tự cấp của Actions, không cần khai báo.
 
@@ -87,11 +94,11 @@ Repo → Settings → Secrets and variables → Actions:
 
 ## Rollback
 
-Mỗi build có tag `:<git-sha>`. Ghim một build cũ trên VPS:
+Mỗi build có tag `:<git-sha>`. Chạy lại job **deploy** của một run cũ trên tab Actions, hoặc
+trên VPS với quyền root:
 
 ```bash
-cd ~/indiework
-IMAGE=ghcr.io/OWNER/indiework:<git-sha-cũ> docker compose -f compose.prod.yml up -d
+sudo /usr/local/sbin/indiework-deploy <git-sha-cũ>
 ```
 
 `up -d` không set `IMAGE` để quay lại `:latest`.

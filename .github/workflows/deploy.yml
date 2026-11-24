@@ -83,43 +83,34 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ---- Pull the new image on the VPS and restart ----
+  # ---- Switch the VPS to this commit ----
+  # The key in DEPLOY_SSH_KEY can do one thing on the VPS: run `indiework-deploy <sha>` (vps/ansible
+  # roles/app_deploy). It has no shell and is not root. That script checks the commit is on main,
+  # pulls ghcr.io/tungnguyenson/indiework:<sha> (one blob at a time, after a prune: the containerd
+  # ingest race and full-disk failures seen here before), restarts app + demo only if the image
+  # changed, waits for both to answer, and puts the previous image back if they do not. Log on the
+  # host: /var/log/app-deploy/indiework.log. Roll back: re-run this job on an older run, or on the
+  # host `sudo /usr/local/sbin/indiework-deploy <sha>`.
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    # Never cancel a deploy mid-flight. Killing the SSH step during
-    # `docker compose pull` orphans a containerd content-store ingest, which
-    # makes the NEXT pull fail with:
-    #   commit failed: rename …/ingest/…/data …/blobs/sha256/…: no such file
-    # Queue concurrent deploys (cancel-in-progress: false) instead of cancelling.
+    permissions:
+      contents: read
+      packages: read
+    # Never cancel a deploy mid-flight: queue concurrent deploys instead.
     concurrency:
       group: deploy-${{ github.ref }}
       cancel-in-progress: false
     steps:
-      - uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          # The GHCR package is public (repo is public), so the VPS pulls it
-          # anonymously — no docker login / GHCR_TOKEN needed.
-          script: |
-            set -e
-            cd ~/indiework
-
-            # Reclaim disk from dangling images BEFORE pulling. A full /var is a
-            # classic trigger for the containerd ingest-commit failure (the
-            # half-written blob is reaped, so the final rename finds nothing).
-            docker image prune -f || true
-            df -h /var | tail -1
-
-            # Pull SERIALIZED. compose.prod.yml runs two services (app + demo) off
-            # the SAME image; `docker compose pull` is parallel by default, so it
-            # fetches the identical blob twice at once and the two ingests race on
-            # commit → "rename …/ingest…: no such file". --parallel 1 = one blob in
-            # flight at a time = no race.
-            pull() { docker compose --parallel 1 -f compose.prod.yml pull; }
-            pull || { echo "pull failed — pruning and retrying once"; docker image prune -f || true; pull; }
-
-            docker compose -f compose.prod.yml up -d
-            docker image prune -f
+      - name: Deploy ${{ github.sha }}
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" >~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" >~/.ssh/known_hosts
+          printf '%s\n' "$GITHUB_TOKEN" | ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes "ci-indiework@$DEPLOY_HOST" "$GITHUB_SHA"
